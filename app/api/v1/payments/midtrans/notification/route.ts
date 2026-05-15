@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { coreApi, MIDTRANS_SERVER_KEY } from "@/lib/midtrans";
+import prisma from "@/core/database/prisma";
+import { coreApi, MIDTRANS_SERVER_KEY } from "@/core/services/midtrans";
 import crypto from "crypto";
 
 /**

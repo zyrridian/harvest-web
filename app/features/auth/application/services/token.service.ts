@@ -1,6 +1,6 @@
 import { SignJWT, jwtVerify } from "jose";
-import { TokenPayload } from "@/types/auth";
-import { AUTH } from "@/config/constants";
+import { TokenPayload } from "@/core/types/auth";
+import { AUTH } from "@/core/config/constants";
 
 /**
  * Get JWT secret from environment variables.

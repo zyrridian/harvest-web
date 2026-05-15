@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
-import { handleRouteError } from "@/lib/errors";
-import { successResponse } from "@/lib/helpers/response";
-import { parsePagination, buildPaginationMeta } from "@/lib/helpers/pagination";
+import prisma from "@/core/database/prisma";
+import { handleRouteError } from "@/core/errors";
+import { successResponse } from "@/core/helpers/response";
+import { parsePagination, buildPaginationMeta } from "@/core/helpers/pagination";
 
 /**
  * @swagger

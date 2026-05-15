@@ -1,4 +1,4 @@
-import { PAGINATION } from "@/config/constants";
+import { PAGINATION } from "@/core/config/constants";
 
 export interface PaginationParams {
   page: number;

@@ -20,27 +20,8 @@ import {
   Users,
   Navigation,
 } from "lucide-react";
-
-// Design System Colors
-const colors = {
-  background: "#FAFAF9",
-  white: "#FFFFFF",
-  heading: "#18181b",
-  body: "#475569",
-  accent: "#166534",
-  accentHover: "#14532d",
-  border: "#E4E4E7",
-  success: "#16a34a",
-  successBg: "#dcfce7",
-  error: "#dc2626",
-};
-
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  user_type: string;
-}
+import { useAuthStore } from "../client/store/auth.store";
+import { useCartStore } from "../client/store/cart.store";
 
 export default function MarketplaceLayout({
   children,
@@ -49,96 +30,44 @@ export default function MarketplaceLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [cartCount, setCartCount] = useState(0);
+  
+  const { user, checkAuth, logout, isLoading } = useAuthStore();
+  const { count: cartCount, fetchCount } = useCartStore();
+  
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
 
   const isAuthPage = pathname === "/login" || pathname === "/register";
 
   useEffect(() => {
     checkAuth();
-    if (!isAuthPage) {
-      fetchCartCount();
-    }
-  }, [pathname]);
+  }, [checkAuth]);
 
-  // Re-fetch cart count whenever a product is added anywhere in the app
   useEffect(() => {
-    const handleCartUpdate = () => fetchCartCount();
+    if (!isAuthPage && user?.user_type === 'CONSUMER') {
+      fetchCount();
+    }
+  }, [pathname, isAuthPage, user, fetchCount]);
+
+  useEffect(() => {
+    const handleCartUpdate = () => fetchCount();
     window.addEventListener("cartUpdated", handleCartUpdate);
     return () => window.removeEventListener("cartUpdated", handleCartUpdate);
-  }, []);
-
-  const checkAuth = async () => {
-    const token = localStorage.getItem("accessToken");
-    if (!token) {
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      const response = await fetch("/api/v1/auth/me", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setUser(data.data);
-        // Redirect farmers to their dashboard
-        if (data.data.user_type === "PRODUCER" && !isAuthPage) {
-          router.push("/farmer/dashboard");
-        }
-      }
-    } catch (error) {
-      console.error("Auth check failed:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const fetchCartCount = async () => {
-    const token = localStorage.getItem("accessToken");
-    if (!token) return;
-
-    try {
-      const response = await fetch("/api/v1/cart", {
-        headers: { Authorization: `Bearer ${token}` },
-        cache: "no-store",
-      });
-      const data = await response.json();
-
-      if (response.ok && data.data) {
-        const items = (data.data.items || []) as Array<any>;
-        // Use a Set to ensure we count unique products even if there are redundant records
-        const uniqueProducts = new Set(
-          items.map((item) => item.product?.product_id || item.productId),
-        );
-        setCartCount(uniqueProducts.size);
-      }
-    } catch (error) {
-      console.error("Failed to fetch cart:", error);
-    }
-  };
+  }, [fetchCount]);
 
   const handleLogout = async () => {
-    try {
-      const token = localStorage.getItem("accessToken");
-      await fetch("/api/v1/auth/logout", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-    } catch (error) {
-      console.error("Logout error:", error);
-    } finally {
-      localStorage.removeItem("accessToken");
-      localStorage.removeItem("refreshToken");
-      setUser(null);
-      router.push("/login");
-    }
+    await logout();
+    setShowUserMenu(false);
+    router.push("/login");
   };
 
-  // Don't show layout for auth pages
+  // Redirect farmers to their dashboard if they land here
+  useEffect(() => {
+    if (user?.user_type === "PRODUCER" && !isAuthPage && !isLoading) {
+      router.push("/farmer/dashboard");
+    }
+  }, [user, isAuthPage, isLoading, router]);
+
   if (isAuthPage) {
     return <>{children}</>;
   }
@@ -152,24 +81,15 @@ export default function MarketplaceLayout({
   ];
 
   return (
-    <div
-      className="min-h-screen"
-      style={{ backgroundColor: colors.background }}
-    >
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header
-        className="sticky top-0 z-50 border-b"
-        style={{ backgroundColor: colors.white, borderColor: colors.border }}
-      >
+      <header className="sticky top-0 z-50 border-b bg-white border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link href="/home" className="flex items-center gap-2">
-              <Leaf size={24} style={{ color: colors.accent }} />
-              <span
-                className="text-lg font-bold tracking-tight"
-                style={{ color: colors.heading }}
-              >
+              <Leaf size={24} className="text-accent" />
+              <span className="text-lg font-bold tracking-tight text-heading">
                 Harvest
               </span>
             </Link>
@@ -180,10 +100,9 @@ export default function MarketplaceLayout({
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="text-sm font-medium transition-colors"
-                  style={{
-                    color: pathname === item.href ? colors.accent : colors.body,
-                  }}
+                  className={`text-sm font-medium transition-colors ${
+                    pathname === item.href ? 'text-accent' : 'text-body hover:text-accent-hover'
+                  }`}
                 >
                   {item.label}
                 </Link>
@@ -195,10 +114,9 @@ export default function MarketplaceLayout({
               {/* Search */}
               <Link
                 href="/search"
-                className="p-2 transition-colors hover:bg-stone-100"
-                style={{ borderRadius: "4px" }}
+                className="p-2 rounded transition-colors hover:bg-stone-100 text-body"
               >
-                <Search size={20} style={{ color: colors.body }} />
+                <Search size={20} />
               </Link>
 
               {user ? (
@@ -206,27 +124,19 @@ export default function MarketplaceLayout({
                   {/* Notifications */}
                   <Link
                     href="/notifications"
-                    className="p-2 transition-colors hover:bg-stone-100 hidden sm:block"
-                    style={{ borderRadius: "4px" }}
+                    className="hidden sm:block p-2 rounded transition-colors hover:bg-stone-100 text-body"
                   >
-                    <Bell size={20} style={{ color: colors.body }} />
+                    <Bell size={20} />
                   </Link>
 
                   {/* Cart */}
                   <Link
                     href="/cart"
-                    className="relative p-2 transition-colors hover:bg-stone-100"
-                    style={{ borderRadius: "4px" }}
+                    className="relative p-2 rounded transition-colors hover:bg-stone-100 text-body"
                   >
-                    <ShoppingCart size={20} style={{ color: colors.body }} />
+                    <ShoppingCart size={20} />
                     {cartCount > 0 && (
-                      <span
-                        className="absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center text-xs font-medium text-white"
-                        style={{
-                          backgroundColor: colors.accent,
-                          borderRadius: "50%",
-                        }}
-                      >
+                      <span className="absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center text-xs font-medium text-white bg-accent rounded-full">
                         {cartCount > 9 ? "9+" : cartCount}
                       </span>
                     )}
@@ -236,24 +146,12 @@ export default function MarketplaceLayout({
                   <div className="relative">
                     <button
                       onClick={() => setShowUserMenu(!showUserMenu)}
-                      className="flex items-center gap-2 p-2 transition-colors hover:bg-stone-100"
-                      style={{ borderRadius: "4px" }}
+                      className="flex items-center gap-2 p-2 rounded transition-colors hover:bg-stone-100"
                     >
-                      <div
-                        className="w-8 h-8 flex items-center justify-center text-sm font-medium"
-                        style={{
-                          backgroundColor: colors.successBg,
-                          color: colors.accent,
-                          borderRadius: "50%",
-                        }}
-                      >
+                      <div className="w-8 h-8 flex items-center justify-center text-sm font-medium bg-success-bg text-accent rounded-full">
                         {user.name.charAt(0).toUpperCase()}
                       </div>
-                      <ChevronDown
-                        size={16}
-                        className="hidden sm:block"
-                        style={{ color: colors.body }}
-                      />
+                      <ChevronDown size={16} className="hidden sm:block text-body" />
                     </button>
 
                     {showUserMenu && (
@@ -262,36 +160,19 @@ export default function MarketplaceLayout({
                           className="fixed inset-0 z-40"
                           onClick={() => setShowUserMenu(false)}
                         />
-                        <div
-                          className="absolute right-0 top-full mt-2 w-56 z-50 border py-2"
-                          style={{
-                            backgroundColor: colors.white,
-                            borderColor: colors.border,
-                            borderRadius: "4px",
-                          }}
-                        >
-                          <div
-                            className="px-4 py-2 border-b"
-                            style={{ borderColor: colors.border }}
-                          >
-                            <p
-                              className="text-sm font-medium"
-                              style={{ color: colors.heading }}
-                            >
+                        <div className="absolute right-0 top-full mt-2 w-56 z-50 border rounded bg-white border-border py-2 shadow-lg">
+                          <div className="px-4 py-2 border-b border-border">
+                            <p className="text-sm font-medium text-heading">
                               {user.name}
                             </p>
-                            <p
-                              className="text-xs"
-                              style={{ color: colors.body }}
-                            >
+                            <p className="text-xs text-body">
                               {user.email}
                             </p>
                           </div>
                           <Link
                             href="/profile"
                             onClick={() => setShowUserMenu(false)}
-                            className="flex items-center gap-3 px-4 py-2 text-sm transition-colors hover:bg-stone-50"
-                            style={{ color: colors.body }}
+                            className="flex items-center gap-3 px-4 py-2 text-sm transition-colors hover:bg-stone-50 text-body"
                           >
                             <User size={16} />
                             My Profile
@@ -299,8 +180,7 @@ export default function MarketplaceLayout({
                           <Link
                             href="/orders"
                             onClick={() => setShowUserMenu(false)}
-                            className="flex items-center gap-3 px-4 py-2 text-sm transition-colors hover:bg-stone-50"
-                            style={{ color: colors.body }}
+                            className="flex items-center gap-3 px-4 py-2 text-sm transition-colors hover:bg-stone-50 text-body"
                           >
                             <Package size={16} />
                             My Orders
@@ -308,20 +188,15 @@ export default function MarketplaceLayout({
                           <Link
                             href="/messages"
                             onClick={() => setShowUserMenu(false)}
-                            className="flex items-center gap-3 px-4 py-2 text-sm transition-colors hover:bg-stone-50"
-                            style={{ color: colors.body }}
+                            className="flex items-center gap-3 px-4 py-2 text-sm transition-colors hover:bg-stone-50 text-body"
                           >
                             <MessageSquare size={16} />
                             Messages
                           </Link>
-                          <div
-                            className="border-t my-1"
-                            style={{ borderColor: colors.border }}
-                          />
+                          <div className="border-t border-border my-1" />
                           <button
                             onClick={handleLogout}
-                            className="flex items-center gap-3 px-4 py-2 text-sm w-full transition-colors hover:bg-stone-50"
-                            style={{ color: colors.error }}
+                            className="flex items-center gap-3 px-4 py-2 text-sm w-full transition-colors hover:bg-stone-50 text-error"
                           >
                             <LogOut size={16} />
                             Sign Out
@@ -335,19 +210,13 @@ export default function MarketplaceLayout({
                 <div className="flex items-center gap-2">
                   <Link
                     href="/login"
-                    className="px-4 py-2 text-sm font-medium transition-colors"
-                    style={{ color: colors.body }}
+                    className="px-4 py-2 text-sm font-medium transition-colors text-body hover:text-accent"
                   >
                     Sign In
                   </Link>
                   <Link
                     href="/register"
-                    className="px-4 py-2 text-sm font-medium transition-colors"
-                    style={{
-                      backgroundColor: colors.accent,
-                      color: colors.white,
-                      borderRadius: "4px",
-                    }}
+                    className="px-4 py-2 text-sm font-medium transition-colors bg-accent text-white rounded hover:bg-accent-hover"
                   >
                     Sign Up
                   </Link>
@@ -357,40 +226,27 @@ export default function MarketplaceLayout({
               {/* Mobile Menu Button */}
               <button
                 onClick={() => setShowMobileMenu(!showMobileMenu)}
-                className="p-2 md:hidden transition-colors hover:bg-stone-100"
-                style={{ borderRadius: "4px" }}
+                className="md:hidden p-2 rounded transition-colors hover:bg-stone-100 text-body"
               >
-                {showMobileMenu ? (
-                  <X size={20} style={{ color: colors.body }} />
-                ) : (
-                  <Menu size={20} style={{ color: colors.body }} />
-                )}
+                {showMobileMenu ? <X size={20} /> : <Menu size={20} />}
               </button>
             </div>
           </div>
 
           {/* Mobile Navigation */}
           {showMobileMenu && (
-            <div
-              className="md:hidden border-t py-4"
-              style={{ borderColor: colors.border }}
-            >
+            <div className="md:hidden border-t border-border py-4">
               <nav className="flex flex-col gap-2">
                 {navItems.map((item) => (
                   <Link
                     key={item.href}
                     href={item.href}
                     onClick={() => setShowMobileMenu(false)}
-                    className="flex items-center gap-3 px-4 py-2 text-sm font-medium transition-colors"
-                    style={{
-                      color:
-                        pathname === item.href ? colors.accent : colors.body,
-                      backgroundColor:
-                        pathname === item.href
-                          ? colors.successBg
-                          : "transparent",
-                      borderRadius: "4px",
-                    }}
+                    className={`flex items-center gap-3 px-4 py-2 text-sm font-medium transition-colors rounded ${
+                      pathname === item.href
+                        ? 'text-accent bg-success-bg'
+                        : 'text-body hover:bg-stone-50'
+                    }`}
                   >
                     <item.icon size={18} />
                     {item.label}
@@ -407,61 +263,46 @@ export default function MarketplaceLayout({
 
       {/* Mobile Bottom Navigation */}
       {user && (
-        <nav
-          className="fixed bottom-0 left-0 right-0 z-50 md:hidden border-t"
-          style={{ backgroundColor: colors.white, borderColor: colors.border }}
-        >
-          <div className="flex items-center justify-around h-16">
-            {[
-              { href: "/home", icon: Home, label: "Home" },
-              { href: "/products", icon: Search, label: "Browse" },
-              { href: "/drop-points", icon: Navigation, label: "Map" },
-              {
-                href: "/cart",
-                icon: ShoppingCart,
-                label: "Cart",
-                badge: cartCount,
-              },
-              { href: "/profile", icon: User, label: "Profile" },
-            ].map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="flex flex-col items-center gap-1 py-2 px-3 relative"
-              >
-                <item.icon
-                  size={20}
-                  style={{
-                    color: pathname === item.href ? colors.accent : colors.body,
-                  }}
-                />
-                <span
-                  className="text-xs"
-                  style={{
-                    color: pathname === item.href ? colors.accent : colors.body,
-                  }}
+        <>
+          <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t bg-white border-border">
+            <div className="flex items-center justify-around h-16">
+              {[
+                { href: "/home", icon: Home, label: "Home" },
+                { href: "/products", icon: Search, label: "Browse" },
+                { href: "/drop-points", icon: Navigation, label: "Map" },
+                {
+                  href: "/cart",
+                  icon: ShoppingCart,
+                  label: "Cart",
+                  badge: cartCount,
+                },
+                { href: "/profile", icon: User, label: "Profile" },
+              ].map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="relative flex flex-col items-center gap-1 py-2 px-3"
                 >
-                  {item.label}
-                </span>
-                {item.badge !== undefined && item.badge > 0 && (
-                  <span
-                    className="absolute top-1 right-1 w-4 h-4 flex items-center justify-center text-[10px] font-medium text-white"
-                    style={{
-                      backgroundColor: colors.accent,
-                      borderRadius: "50%",
-                    }}
-                  >
-                    {item.badge > 9 ? "9+" : item.badge}
+                  <item.icon
+                    size={20}
+                    className={pathname === item.href ? 'text-accent' : 'text-body'}
+                  />
+                  <span className={`text-[10px] ${pathname === item.href ? 'text-accent font-medium' : 'text-body'}`}>
+                    {item.label}
                   </span>
-                )}
-              </Link>
-            ))}
-          </div>
-        </nav>
+                  {item.badge !== undefined && item.badge > 0 && (
+                    <span className="absolute top-1 right-1 w-4 h-4 flex items-center justify-center text-[10px] font-medium text-white bg-accent rounded-full">
+                      {item.badge > 9 ? "9+" : item.badge}
+                    </span>
+                  )}
+                </Link>
+              ))}
+            </div>
+          </nav>
+          {/* Bottom padding for mobile nav */}
+          <div className="h-16 md:hidden" />
+        </>
       )}
-
-      {/* Bottom padding for mobile nav */}
-      {user && <div className="h-16 md:hidden" />}
     </div>
   );
 }

@@ -16,7 +16,7 @@ import {
   Clock,
   ShoppingBag,
 } from "lucide-react";
-import { getSocket } from "@/lib/socket";
+import { getSocket } from "@/core/services/socket";
 
 // Design System Colors
 const colors = {

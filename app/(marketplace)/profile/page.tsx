@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -19,24 +19,11 @@ import {
   Loader2,
   AlertCircle,
   CheckCircle,
-  Leaf,
   ChefHat,
 } from "lucide-react";
-
-// Design System Colors
-const colors = {
-  background: "#FAFAF9",
-  white: "#FFFFFF",
-  heading: "#18181b",
-  body: "#475569",
-  accent: "#166534",
-  accentHover: "#14532d",
-  border: "#E4E4E7",
-  success: "#16a34a",
-  successBg: "#dcfce7",
-  error: "#dc2626",
-  errorBg: "#fee2e2",
-};
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiClient } from "../../client/api/client";
+import { useAuthStore } from "../../client/store/auth.store";
 
 interface UserProfile {
   user_id: string;
@@ -71,12 +58,10 @@ interface UserProfile {
 
 export default function ProfilePage() {
   const router = useRouter();
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { logout, checkAuth } = useAuthStore();
+  
   const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
 
   // Form states
   const [name, setName] = useState("");
@@ -85,62 +70,30 @@ export default function ProfilePage() {
   const [address, setAddress] = useState("");
   const [city, setCity] = useState("");
 
+  const { data: userProfile, isLoading, error: fetchError } = useQuery({
+    queryKey: ["userProfile"],
+    queryFn: async () => {
+      const { data, error } = await apiClient<UserProfile>("/auth/me");
+      if (error) throw new Error(error);
+      return data;
+    },
+    retry: false,
+  });
+
   useEffect(() => {
-    fetchProfile();
-  }, []);
-
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem("accessToken");
-    if (!token) {
-      router.push("/login?redirect=/profile");
-      return null;
+    if (userProfile) {
+      setName(userProfile.name || "");
+      setPhoneNumber(userProfile.phone_number || "");
+      setBio(userProfile.profile?.bio || "");
+      setAddress(userProfile.profile?.address || "");
+      setCity(userProfile.profile?.city || "");
     }
-    return {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    };
-  };
+  }, [userProfile]);
 
-  const fetchProfile = async () => {
-    const headers = getAuthHeaders();
-    if (!headers) return;
-
-    try {
-      const response = await fetch("/api/v1/auth/me", { headers });
-
-      if (response.status === 401) {
-        router.push("/login?redirect=/profile");
-        return;
-      }
-
-      const data = await response.json();
-      if (response.ok) {
-        setUser(data.data);
-        setName(data.data.name || "");
-        setPhoneNumber(data.data.phone_number || "");
-        setBio(data.data.profile?.bio || "");
-        setAddress(data.data.profile?.address || "");
-        setCity(data.data.profile?.city || "");
-      }
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const saveProfile = async () => {
-    const headers = getAuthHeaders();
-    if (!headers) return;
-
-    setSaving(true);
-    setError("");
-    setSuccess("");
-
-    try {
-      const response = await fetch("/api/v1/users/profile", {
+  const updateProfileMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await apiClient<any>("/users/profile", {
         method: "PATCH",
-        headers,
         body: JSON.stringify({
           name,
           phone_number: phoneNumber || null,
@@ -149,62 +102,39 @@ export default function ProfilePage() {
           city: city || null,
         }),
       });
+      if (error) throw new Error(error);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["userProfile"] });
+      checkAuth(); // Update global user store
+      setEditing(false);
+    },
+  });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        setSuccess("Profile updated successfully");
-        setEditing(false);
-        fetchProfile();
-      } else {
-        setError(data.message || "Failed to update profile");
-      }
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
+  const handleLogout = async () => {
+    await logout();
     router.push("/login");
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
-      <div
-        className="min-h-screen flex items-center justify-center"
-        style={{ backgroundColor: colors.background }}
-      >
-        <Loader2
-          size={32}
-          className="animate-spin"
-          style={{ color: colors.accent }}
-        />
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 size={32} className="animate-spin text-accent" />
       </div>
     );
   }
 
-  if (!user) {
+  if (fetchError || !userProfile) {
     return (
-      <div
-        className="min-h-screen flex items-center justify-center p-4"
-        style={{ backgroundColor: colors.background }}
-      >
+      <div className="min-h-screen flex items-center justify-center p-4 bg-background">
         <div className="text-center">
-          <p className="mb-4" style={{ color: colors.error }}>
+          <p className="mb-4 text-error">
             Failed to load profile
           </p>
           <button
-            onClick={fetchProfile}
-            className="px-6 py-2 text-sm font-medium"
-            style={{
-              backgroundColor: colors.accent,
-              color: colors.white,
-              borderRadius: "4px",
-            }}
+            onClick={() => queryClient.invalidateQueries({ queryKey: ["userProfile"] })}
+            className="px-6 py-2 text-sm font-medium bg-accent text-white rounded hover:bg-accent-hover"
           >
             Try again
           </button>
@@ -217,13 +147,13 @@ export default function ProfilePage() {
     {
       icon: Package,
       label: "My Orders",
-      description: `${user.stats?.total_orders || 0} orders`,
+      description: `${userProfile.stats?.total_orders || 0} orders`,
       href: "/orders",
     },
     {
       icon: Heart,
       label: "Favorites",
-      description: `${user.stats?.favorites_count || 0} items`,
+      description: `${userProfile.stats?.favorites_count || 0} items`,
       href: "/profile/favorites",
     },
     {
@@ -259,66 +189,44 @@ export default function ProfilePage() {
   ];
 
   return (
-    <div
-      style={{ backgroundColor: colors.background }}
-      className="min-h-screen pb-24 md:pb-8"
-    >
+    <div className="min-h-screen pb-24 md:pb-8 bg-background">
       {/* Header */}
-      <div
-        className="border-b"
-        style={{ backgroundColor: colors.white, borderColor: colors.border }}
-      >
+      <div className="border-b bg-white border-border">
         <div className="max-w-2xl mx-auto px-4 py-6">
           {/* Avatar & basic info */}
           <div className="flex items-center gap-4">
             <div className="relative">
-              <div
-                className="w-20 h-20 flex items-center justify-center overflow-hidden"
-                style={{
-                  backgroundColor: colors.background,
-                  borderRadius: "4px",
-                }}
-              >
-                {user.avatar_url ? (
+              <div className="w-20 h-20 flex items-center justify-center overflow-hidden bg-background rounded">
+                {userProfile.avatar_url ? (
                   <img
-                    src={user.avatar_url}
-                    alt={user.name}
+                    src={userProfile.avatar_url}
+                    alt={userProfile.name}
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <User size={32} style={{ color: colors.accent }} />
+                  <User size={32} className="text-accent" />
                 )}
               </div>
-              <button
-                className="absolute -bottom-1 -right-1 w-8 h-8 flex items-center justify-center border"
-                style={{
-                  backgroundColor: colors.white,
-                  borderColor: colors.border,
-                  borderRadius: "4px",
-                }}
-              >
-                <Camera size={14} style={{ color: colors.body }} />
+              <button className="absolute -bottom-1 -right-1 w-8 h-8 flex items-center justify-center border bg-white border-border rounded shadow-sm hover:bg-stone-50">
+                <Camera size={14} className="text-body" />
               </button>
             </div>
 
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <h1
-                  className="text-xl font-bold truncate"
-                  style={{ color: colors.heading }}
-                >
-                  {user.name}
+                <h1 className="text-xl font-bold truncate text-heading">
+                  {userProfile.name}
                 </h1>
-                {user.is_verified && (
-                  <CheckCircle size={18} style={{ color: colors.success }} />
+                {userProfile.is_verified && (
+                  <CheckCircle size={18} className="text-success" />
                 )}
               </div>
-              <p className="text-sm truncate" style={{ color: colors.body }}>
-                {user.email}
+              <p className="text-sm truncate text-body">
+                {userProfile.email}
               </p>
-              <p className="text-xs mt-1" style={{ color: colors.body }}>
+              <p className="text-xs mt-1 text-body">
                 Member since{" "}
-                {new Date(user.created_at).toLocaleDateString("en-US", {
+                {new Date(userProfile.created_at).toLocaleDateString("en-US", {
                   month: "long",
                   year: "numeric",
                 })}
@@ -327,45 +235,29 @@ export default function ProfilePage() {
           </div>
 
           {/* Stats */}
-          {user.stats && (
-            <div
-              className="grid grid-cols-3 gap-4 mt-6 p-4 border"
-              style={{
-                backgroundColor: colors.background,
-                borderColor: colors.border,
-                borderRadius: "4px",
-              }}
-            >
+          {userProfile.stats && (
+            <div className="grid grid-cols-3 gap-4 mt-6 p-4 border bg-background border-border rounded">
               <div className="text-center">
-                <p
-                  className="text-xl font-bold"
-                  style={{ color: colors.heading }}
-                >
-                  {user.stats.total_orders}
+                <p className="text-xl font-bold text-heading">
+                  {userProfile.stats.total_orders}
                 </p>
-                <p className="text-xs" style={{ color: colors.body }}>
+                <p className="text-xs text-body">
                   Orders
                 </p>
               </div>
               <div className="text-center">
-                <p
-                  className="text-xl font-bold"
-                  style={{ color: colors.heading }}
-                >
-                  {user.stats.favorites_count}
+                <p className="text-xl font-bold text-heading">
+                  {userProfile.stats.favorites_count}
                 </p>
-                <p className="text-xs" style={{ color: colors.body }}>
+                <p className="text-xs text-body">
                   Favorites
                 </p>
               </div>
               <div className="text-center">
-                <p
-                  className="text-xl font-bold"
-                  style={{ color: colors.accent }}
-                >
-                  IDR {(user.stats.total_spent / 1000000).toFixed(1)}M
+                <p className="text-xl font-bold text-accent">
+                  IDR {(userProfile.stats.total_spent / 1000000).toFixed(1)}M
                 </p>
-                <p className="text-xs" style={{ color: colors.body }}>
+                <p className="text-xs text-body">
                   Spent
                 </p>
               </div>
@@ -376,67 +268,44 @@ export default function ProfilePage() {
 
       <div className="max-w-2xl mx-auto px-4 py-6">
         {/* Messages */}
-        {error && (
-          <div
-            className="flex items-center gap-3 p-4 mb-6 border"
-            style={{
-              backgroundColor: colors.errorBg,
-              borderColor: colors.error,
-              borderRadius: "4px",
-            }}
-          >
-            <AlertCircle size={18} style={{ color: colors.error }} />
-            <p className="text-sm" style={{ color: colors.error }}>
-              {error}
+        {updateProfileMutation.isError && (
+          <div className="flex items-center gap-3 p-4 mb-6 border bg-error-bg border-error rounded">
+            <AlertCircle size={18} className="text-error" />
+            <p className="text-sm text-error">
+              {updateProfileMutation.error?.message}
             </p>
           </div>
         )}
 
-        {success && (
-          <div
-            className="flex items-center gap-3 p-4 mb-6 border"
-            style={{
-              backgroundColor: colors.successBg,
-              borderColor: colors.success,
-              borderRadius: "4px",
-            }}
-          >
-            <CheckCircle size={18} style={{ color: colors.success }} />
-            <p className="text-sm" style={{ color: colors.success }}>
-              {success}
+        {updateProfileMutation.isSuccess && (
+          <div className="flex items-center gap-3 p-4 mb-6 border bg-success-bg border-success rounded">
+            <CheckCircle size={18} className="text-success" />
+            <p className="text-sm text-success">
+              Profile updated successfully
             </p>
           </div>
         )}
 
         {/* Profile info / Edit form */}
-        <div
-          className="border mb-6"
-          style={{
-            backgroundColor: colors.white,
-            borderColor: colors.border,
-            borderRadius: "4px",
-          }}
-        >
-          <div
-            className="p-4 border-b flex items-center justify-between"
-            style={{ borderColor: colors.border }}
-          >
-            <h2 className="font-bold" style={{ color: colors.heading }}>
+        <div className="border mb-6 bg-white border-border rounded">
+          <div className="p-4 border-b border-border flex items-center justify-between">
+            <h2 className="font-bold text-heading">
               Personal Information
             </h2>
             {!editing ? (
               <button
                 onClick={() => setEditing(true)}
-                className="text-sm font-medium"
-                style={{ color: colors.accent }}
+                className="text-sm font-medium text-accent hover:text-accent-hover"
               >
                 Edit
               </button>
             ) : (
               <button
-                onClick={() => setEditing(false)}
-                className="text-sm font-medium"
-                style={{ color: colors.body }}
+                onClick={() => {
+                  setEditing(false);
+                  updateProfileMutation.reset();
+                }}
+                className="text-sm font-medium text-body hover:text-heading"
               >
                 Cancel
               </button>
@@ -447,77 +316,55 @@ export default function ProfilePage() {
             {!editing ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
-                  <User size={18} style={{ color: colors.accent }} />
+                  <User size={18} className="text-accent" />
                   <div>
-                    <p className="text-xs" style={{ color: colors.body }}>
-                      Full Name
-                    </p>
-                    <p
-                      className="text-sm font-medium"
-                      style={{ color: colors.heading }}
-                    >
-                      {user.name}
+                    <p className="text-xs text-body">Full Name</p>
+                    <p className="text-sm font-medium text-heading">
+                      {userProfile.name}
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <Mail size={18} style={{ color: colors.accent }} />
+                  <Mail size={18} className="text-accent" />
                   <div>
-                    <p className="text-xs" style={{ color: colors.body }}>
-                      Email
-                    </p>
-                    <p
-                      className="text-sm font-medium"
-                      style={{ color: colors.heading }}
-                    >
-                      {user.email}
+                    <p className="text-xs text-body">Email</p>
+                    <p className="text-sm font-medium text-heading">
+                      {userProfile.email}
                     </p>
                   </div>
                 </div>
 
-                {user.phone_number && (
+                {userProfile.phone_number && (
                   <div className="flex items-center gap-3">
-                    <Phone size={18} style={{ color: colors.accent }} />
+                    <Phone size={18} className="text-accent" />
                     <div>
-                      <p className="text-xs" style={{ color: colors.body }}>
-                        Phone
-                      </p>
-                      <p
-                        className="text-sm font-medium"
-                        style={{ color: colors.heading }}
-                      >
-                        {user.phone_number}
+                      <p className="text-xs text-body">Phone</p>
+                      <p className="text-sm font-medium text-heading">
+                        {userProfile.phone_number}
                       </p>
                     </div>
                   </div>
                 )}
 
-                {user.profile?.city && (
+                {userProfile.profile?.city && (
                   <div className="flex items-center gap-3">
-                    <MapPin size={18} style={{ color: colors.accent }} />
+                    <MapPin size={18} className="text-accent" />
                     <div>
-                      <p className="text-xs" style={{ color: colors.body }}>
-                        Location
-                      </p>
-                      <p
-                        className="text-sm font-medium"
-                        style={{ color: colors.heading }}
-                      >
-                        {user.profile.city}
-                        {user.profile.state && `, ${user.profile.state}`}
+                      <p className="text-xs text-body">Location</p>
+                      <p className="text-sm font-medium text-heading">
+                        {userProfile.profile.city}
+                        {userProfile.profile.state && `, ${userProfile.profile.state}`}
                       </p>
                     </div>
                   </div>
                 )}
 
-                {user.profile?.bio && (
+                {userProfile.profile?.bio && (
                   <div>
-                    <p className="text-xs mb-1" style={{ color: colors.body }}>
-                      Bio
-                    </p>
-                    <p className="text-sm" style={{ color: colors.heading }}>
-                      {user.profile.bio}
+                    <p className="text-xs mb-1 text-body">Bio</p>
+                    <p className="text-sm text-heading">
+                      {userProfile.profile.bio}
                     </p>
                   </div>
                 )}
@@ -526,15 +373,12 @@ export default function ProfilePage() {
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
-                  saveProfile();
+                  updateProfileMutation.mutate();
                 }}
                 className="space-y-4"
               >
                 <div>
-                  <label
-                    className="block text-sm font-medium mb-1"
-                    style={{ color: colors.heading }}
-                  >
+                  <label className="block text-sm font-medium mb-1 text-heading">
                     Full Name
                   </label>
                   <input
@@ -542,109 +386,67 @@ export default function ProfilePage() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     required
-                    className="w-full px-3 py-2 text-sm border outline-none focus:border-green-600"
-                    style={{
-                      borderColor: colors.border,
-                      borderRadius: "4px",
-                      color: colors.heading,
-                    }}
+                    className="w-full px-3 py-2 text-sm border border-border rounded outline-none focus:border-accent text-heading"
                   />
                 </div>
 
                 <div>
-                  <label
-                    className="block text-sm font-medium mb-1"
-                    style={{ color: colors.heading }}
-                  >
+                  <label className="block text-sm font-medium mb-1 text-heading">
                     Phone Number
                   </label>
                   <input
                     type="tel"
                     value={phoneNumber}
                     onChange={(e) => setPhoneNumber(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border outline-none focus:border-green-600"
-                    style={{
-                      borderColor: colors.border,
-                      borderRadius: "4px",
-                      color: colors.heading,
-                    }}
+                    className="w-full px-3 py-2 text-sm border border-border rounded outline-none focus:border-accent text-heading"
                     placeholder="+62 812 3456 7890"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label
-                      className="block text-sm font-medium mb-1"
-                      style={{ color: colors.heading }}
-                    >
+                    <label className="block text-sm font-medium mb-1 text-heading">
                       City
                     </label>
                     <input
                       type="text"
                       value={city}
                       onChange={(e) => setCity(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border outline-none focus:border-green-600"
-                      style={{
-                        borderColor: colors.border,
-                        borderRadius: "4px",
-                        color: colors.heading,
-                      }}
+                      className="w-full px-3 py-2 text-sm border border-border rounded outline-none focus:border-accent text-heading"
                     />
                   </div>
                   <div>
-                    <label
-                      className="block text-sm font-medium mb-1"
-                      style={{ color: colors.heading }}
-                    >
+                    <label className="block text-sm font-medium mb-1 text-heading">
                       Address
                     </label>
                     <input
                       type="text"
                       value={address}
                       onChange={(e) => setAddress(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border outline-none focus:border-green-600"
-                      style={{
-                        borderColor: colors.border,
-                        borderRadius: "4px",
-                        color: colors.heading,
-                      }}
+                      className="w-full px-3 py-2 text-sm border border-border rounded outline-none focus:border-accent text-heading"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label
-                    className="block text-sm font-medium mb-1"
-                    style={{ color: colors.heading }}
-                  >
+                  <label className="block text-sm font-medium mb-1 text-heading">
                     Bio
                   </label>
                   <textarea
                     value={bio}
                     onChange={(e) => setBio(e.target.value)}
                     rows={3}
-                    className="w-full px-3 py-2 text-sm border outline-none focus:border-green-600"
-                    style={{
-                      borderColor: colors.border,
-                      borderRadius: "4px",
-                      color: colors.heading,
-                    }}
+                    className="w-full px-3 py-2 text-sm border border-border rounded outline-none focus:border-accent text-heading"
                     placeholder="Tell us about yourself..."
                   />
                 </div>
 
                 <button
                   type="submit"
-                  disabled={saving}
-                  className="w-full py-2.5 text-sm font-medium transition-colors disabled:opacity-50"
-                  style={{
-                    backgroundColor: colors.accent,
-                    color: colors.white,
-                    borderRadius: "4px",
-                  }}
+                  disabled={updateProfileMutation.isPending}
+                  className="w-full py-2.5 text-sm font-medium transition-colors bg-accent text-white rounded disabled:opacity-50 hover:bg-accent-hover"
                 >
-                  {saving ? "Saving..." : "Save Changes"}
+                  {updateProfileMutation.isPending ? "Saving..." : "Save Changes"}
                 </button>
               </form>
             )}
@@ -652,43 +454,27 @@ export default function ProfilePage() {
         </div>
 
         {/* Menu items */}
-        <div
-          className="border divide-y"
-          style={{
-            backgroundColor: colors.white,
-            borderColor: colors.border,
-            borderRadius: "4px",
-          }}
-        >
+        <div className="border divide-y bg-white border-border rounded">
           {menuItems.map((item) => {
             const Icon = item.icon;
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className="flex items-center gap-4 p-4 transition-colors hover:bg-gray-50"
+                className="flex items-center gap-4 p-4 transition-colors hover:bg-stone-50"
               >
-                <div
-                  className="w-10 h-10 flex items-center justify-center"
-                  style={{
-                    backgroundColor: colors.background,
-                    borderRadius: "4px",
-                  }}
-                >
-                  <Icon size={20} style={{ color: colors.accent }} />
+                <div className="w-10 h-10 flex items-center justify-center bg-background rounded">
+                  <Icon size={20} className="text-accent" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p
-                    className="text-sm font-medium"
-                    style={{ color: colors.heading }}
-                  >
+                  <p className="text-sm font-medium text-heading">
                     {item.label}
                   </p>
-                  <p className="text-xs" style={{ color: colors.body }}>
+                  <p className="text-xs text-body">
                     {item.description}
                   </p>
                 </div>
-                <ChevronRight size={18} style={{ color: colors.body }} />
+                <ChevronRight size={18} className="text-body" />
               </Link>
             );
           })}
@@ -697,13 +483,7 @@ export default function ProfilePage() {
         {/* Logout */}
         <button
           onClick={handleLogout}
-          className="w-full mt-6 p-4 border flex items-center justify-center gap-2 text-sm font-medium transition-colors hover:bg-red-50"
-          style={{
-            backgroundColor: colors.white,
-            borderColor: colors.error,
-            color: colors.error,
-            borderRadius: "4px",
-          }}
+          className="w-full mt-6 p-4 border flex items-center justify-center gap-2 text-sm font-medium transition-colors bg-white border-error text-error rounded hover:bg-error-bg"
         >
           <LogOut size={18} />
           Sign Out

@@ -16,21 +16,10 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-
-// Design System Colors
-const colors = {
-  background: "#FAFAF9",
-  white: "#FFFFFF",
-  heading: "#18181b",
-  body: "#475569",
-  accent: "#166534",
-  accentHover: "#14532d",
-  border: "#E4E4E7",
-  success: "#16a34a",
-  successBg: "#dcfce7",
-  error: "#dc2626",
-  warning: "#ca8a04",
-};
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiClient } from "../../client/api/client";
+import { useCartStore } from "../../client/store/cart.store";
+import { useAuthStore } from "../../client/store/auth.store";
 
 interface Product {
   id: string;
@@ -68,15 +57,11 @@ interface Pagination {
 function ProductsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
+  const { user } = useAuthStore();
+  const { fetchCount } = useCartStore();
 
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [pagination, setPagination] = useState<Pagination | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [addingToCart, setAddingToCart] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
-  // Map of productId -> quantity already in cart
-  const [cartQuantities, setCartQuantities] = useState<Record<string, number>>({});
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
@@ -93,55 +78,26 @@ function ProductsContent() {
     parseInt(searchParams.get("page") || "1"),
   );
 
-  useEffect(() => {
-    fetchCategories();
-    fetchCartQuantities();
-    const handleCartUpdate = () => fetchCartQuantities();
-    window.addEventListener("cartUpdated", handleCartUpdate);
-    return () => window.removeEventListener("cartUpdated", handleCartUpdate);
-  }, []);
+  // Queries
+  const { data: categories = [] } = useQuery({
+    queryKey: ["categories"],
+    queryFn: async () => {
+      const { data } = await apiClient<any>("/categories");
+      return Array.isArray(data) ? data : data?.categories || [];
+    },
+  });
 
-  useEffect(() => {
-    fetchProducts();
-  }, [selectedCategory, isOrganic, minPrice, maxPrice, sortBy, currentPage]);
-
-  const fetchCategories = async () => {
-    try {
-      const response = await fetch("/api/v1/categories");
-      const data = await response.json();
-      if (response.ok) {
-        setCategories(
-          Array.isArray(data.data) ? data.data : data.data.categories || [],
-        );
-      }
-    } catch (error) {
-      console.error("Failed to fetch categories:", error);
-    }
-  };
-
-  const fetchCartQuantities = async () => {
-    const token = localStorage.getItem("accessToken");
-    if (!token) return;
-    try {
-      const res = await fetch("/api/v1/cart", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (res.ok && data.data?.items) {
-        const map: Record<string, number> = {};
-        for (const item of data.data.items as Array<{ product: { product_id: string }; quantity: number }>) {
-          map[item.product.product_id] = item.quantity;
-        }
-        setCartQuantities(map);
-      }
-    } catch {
-      // silent
-    }
-  };
-
-  const fetchProducts = async () => {
-    setLoading(true);
-    try {
+  const { data: productsData, isLoading: loading } = useQuery({
+    queryKey: [
+      "products",
+      selectedCategory,
+      isOrganic,
+      minPrice,
+      maxPrice,
+      sortBy,
+      currentPage,
+    ],
+    queryFn: async () => {
       const params = new URLSearchParams();
       params.set("page", currentPage.toString());
       params.set("limit", "20");
@@ -152,20 +108,48 @@ function ProductsContent() {
       if (maxPrice) params.set("max_price", maxPrice);
       if (sortBy) params.set("sort_by", sortBy);
 
-      const response = await fetch(`/api/v1/products?${params.toString()}`);
-      const data = await response.json();
+      const { data } = await apiClient<any>(`/products?${params.toString()}`);
+      return {
+        products: (data?.products || data || []) as Product[],
+        pagination: (data?.pagination || null) as Pagination | null,
+      };
+    },
+  });
 
-      if (response.ok) {
-        const productData = data.data.products || data.data || [];
-        setProducts(productData);
-        setPagination(data.data.pagination || null);
+  const { data: cartItemsMap = {} } = useQuery({
+    queryKey: ["cartQuantities", user?.id],
+    queryFn: async () => {
+      if (!user) return {};
+      const { data } = await apiClient<any>("/cart");
+      if (data?.items) {
+        const map: Record<string, number> = {};
+        for (const item of data.items) {
+          map[item.product?.product_id || item.productId] = item.quantity;
+        }
+        return map;
       }
-    } catch (error) {
-      console.error("Failed to fetch products:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+      return {};
+    },
+    enabled: !!user,
+  });
+
+  const addToCartMutation = useMutation({
+    mutationFn: async (productId: string) => {
+      const { data, error } = await apiClient<any>("/cart/items", {
+        method: "POST",
+        body: JSON.stringify({ product_id: productId, quantity: 1 }),
+      });
+      if (error) throw new Error(error);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["cartQuantities"] });
+      fetchCount(); // Update the global cart count
+    },
+  });
+
+  const products = productsData?.products || [];
+  const pagination = productsData?.pagination;
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -200,32 +184,12 @@ function ProductsContent() {
     router.push("/products");
   };
 
-  const addToCart = async (productId: string) => {
-    const token = localStorage.getItem("accessToken");
-    if (!token) {
+  const addToCart = (productId: string) => {
+    if (!user) {
       router.push(`/login?redirect=/products`);
       return;
     }
-
-    setAddingToCart(productId);
-    try {
-      const response = await fetch("/api/v1/cart/items", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ product_id: productId, quantity: 1 }),
-      });
-
-      if (response.ok) {
-        window.dispatchEvent(new Event("cartUpdated"));
-      }
-    } catch (error) {
-      console.error("Add to cart error:", error);
-    } finally {
-      setAddingToCart(null);
-    }
+    addToCartMutation.mutate(productId);
   };
 
   const hasActiveFilters =
@@ -236,60 +200,42 @@ function ProductsContent() {
     sortBy !== "newest";
 
   return (
-    <div
-      style={{ backgroundColor: colors.background }}
-      className="min-h-screen pb-24 md:pb-8"
-    >
+    <div className="min-h-screen pb-24 md:pb-8 bg-background">
       {/* Header */}
-      <div
-        className="border-b sticky top-0 z-10"
-        style={{ backgroundColor: colors.white, borderColor: colors.border }}
-      >
+      <div className="border-b sticky top-0 z-10 bg-white border-border">
         <div className="max-w-7xl mx-auto px-4 py-4">
           {/* Search Bar */}
           <form onSubmit={handleSearch} className="flex gap-3 mb-4">
             <div className="flex-1 relative">
               <Search
                 size={18}
-                className="absolute left-4 top-1/2 -translate-y-1/2"
-                style={{ color: colors.body }}
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-body"
               />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search products..."
-                className="w-full pl-12 pr-4 py-3 text-sm border outline-none focus:border-green-600"
-                style={{
-                  borderColor: colors.border,
-                  borderRadius: "4px",
-                  color: colors.heading,
-                }}
+                className="w-full pl-12 pr-4 py-3 text-sm border border-border rounded outline-none focus:border-accent text-heading"
               />
             </div>
             <button
               type="button"
               onClick={() => setShowFilters(!showFilters)}
-              className="px-4 py-3 border flex items-center gap-2 text-sm font-medium transition-colors hover:bg-gray-50"
-              style={{
-                borderColor: hasActiveFilters ? colors.accent : colors.border,
-                color: hasActiveFilters ? colors.accent : colors.heading,
-                borderRadius: "4px",
-              }}
+              className={`px-4 py-3 border flex items-center gap-2 text-sm font-medium transition-colors rounded hover:bg-stone-50 ${
+                hasActiveFilters ? "border-accent text-accent" : "border-border text-heading"
+              }`}
             >
               <Filter size={18} />
               <span className="hidden sm:inline">Filters</span>
               {hasActiveFilters && (
-                <span
-                  className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: colors.accent }}
-                />
+                <span className="w-2 h-2 rounded-full bg-accent" />
               )}
             </button>
           </form>
 
           {/* Inline Filters */}
-          <div className="flex items-center gap-3 overflow-x-auto pb-2">
+          <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-hide">
             {/* Sort */}
             <div className="relative flex-shrink-0">
               <select
@@ -298,12 +244,7 @@ function ProductsContent() {
                   setSortBy(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="appearance-none px-4 py-2 pr-8 text-sm border outline-none bg-white cursor-pointer"
-                style={{
-                  borderColor: colors.border,
-                  borderRadius: "4px",
-                  color: colors.heading,
-                }}
+                className="appearance-none px-4 py-2 pr-8 text-sm border border-border rounded outline-none bg-white text-heading cursor-pointer"
               >
                 <option value="newest">Newest</option>
                 <option value="price">Price: Low to High</option>
@@ -313,13 +254,12 @@ function ProductsContent() {
               </select>
               <ChevronDown
                 size={14}
-                className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
-                style={{ color: colors.body }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-body"
               />
             </div>
 
             {/* Category chips */}
-            {categories.slice(0, 6).map((category) => (
+            {categories.slice(0, 6).map((category: Category) => (
               <button
                 key={category.id}
                 onClick={() => {
@@ -328,22 +268,11 @@ function ProductsContent() {
                   );
                   setCurrentPage(1);
                 }}
-                className="flex-shrink-0 px-4 py-2 text-sm border transition-colors whitespace-nowrap"
-                style={{
-                  borderColor:
-                    selectedCategory === category.slug
-                      ? colors.accent
-                      : colors.border,
-                  backgroundColor:
-                    selectedCategory === category.slug
-                      ? colors.successBg
-                      : colors.white,
-                  color:
-                    selectedCategory === category.slug
-                      ? colors.accent
-                      : colors.body,
-                  borderRadius: "4px",
-                }}
+                className={`flex-shrink-0 px-4 py-2 text-sm border transition-colors whitespace-nowrap rounded ${
+                  selectedCategory === category.slug
+                    ? "border-accent bg-success-bg text-accent"
+                    : "border-border bg-white text-body hover:bg-stone-50"
+                }`}
               >
                 {category.emoji && (
                   <span className="mr-1">{category.emoji}</span>
@@ -358,13 +287,11 @@ function ProductsContent() {
                 setIsOrganic(!isOrganic);
                 setCurrentPage(1);
               }}
-              className="flex-shrink-0 px-4 py-2 text-sm border transition-colors whitespace-nowrap"
-              style={{
-                borderColor: isOrganic ? colors.accent : colors.border,
-                backgroundColor: isOrganic ? colors.successBg : colors.white,
-                color: isOrganic ? colors.accent : colors.body,
-                borderRadius: "4px",
-              }}
+              className={`flex-shrink-0 px-4 py-2 text-sm border transition-colors whitespace-nowrap rounded ${
+                isOrganic
+                  ? "border-accent bg-success-bg text-accent"
+                  : "border-border bg-white text-body hover:bg-stone-50"
+              }`}
             >
               Organic Only
             </button>
@@ -372,8 +299,7 @@ function ProductsContent() {
             {hasActiveFilters && (
               <button
                 onClick={clearFilters}
-                className="flex-shrink-0 px-4 py-2 text-sm flex items-center gap-1 hover:underline"
-                style={{ color: colors.error }}
+                className="flex-shrink-0 px-4 py-2 text-sm flex items-center gap-1 hover:underline text-error"
               >
                 <X size={14} />
                 Clear all
@@ -384,17 +310,11 @@ function ProductsContent() {
 
         {/* Expanded Filters Panel */}
         {showFilters && (
-          <div
-            className="border-t px-4 py-4"
-            style={{ borderColor: colors.border }}
-          >
+          <div className="border-t border-border px-4 py-4 bg-white">
             <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-4">
               {/* Category select */}
               <div>
-                <label
-                  className="block text-xs font-medium mb-2"
-                  style={{ color: colors.body }}
-                >
+                <label className="block text-xs font-medium mb-2 text-body">
                   Category
                 </label>
                 <select
@@ -403,15 +323,10 @@ function ProductsContent() {
                     setSelectedCategory(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="w-full px-3 py-2 text-sm border outline-none bg-white"
-                  style={{
-                    borderColor: colors.border,
-                    borderRadius: "4px",
-                    color: colors.heading,
-                  }}
+                  className="w-full px-3 py-2 text-sm border border-border rounded outline-none bg-white text-heading"
                 >
                   <option value="">All Categories</option>
-                  {categories.map((cat) => (
+                  {categories.map((cat: Category) => (
                     <option key={cat.id} value={cat.slug}>
                       {cat.name}
                     </option>
@@ -421,70 +336,42 @@ function ProductsContent() {
 
               {/* Price range */}
               <div>
-                <label
-                  className="block text-xs font-medium mb-2"
-                  style={{ color: colors.body }}
-                >
+                <label className="block text-xs font-medium mb-2 text-body">
                   Min Price
                 </label>
                 <input
                   type="number"
                   value={minPrice}
                   onChange={(e) => setMinPrice(e.target.value)}
-                  onBlur={fetchProducts}
                   placeholder="0"
-                  className="w-full px-3 py-2 text-sm border outline-none"
-                  style={{
-                    borderColor: colors.border,
-                    borderRadius: "4px",
-                    color: colors.heading,
-                  }}
+                  className="w-full px-3 py-2 text-sm border border-border rounded outline-none text-heading"
                 />
               </div>
 
               <div>
-                <label
-                  className="block text-xs font-medium mb-2"
-                  style={{ color: colors.body }}
-                >
+                <label className="block text-xs font-medium mb-2 text-body">
                   Max Price
                 </label>
                 <input
                   type="number"
                   value={maxPrice}
                   onChange={(e) => setMaxPrice(e.target.value)}
-                  onBlur={fetchProducts}
                   placeholder="Any"
-                  className="w-full px-3 py-2 text-sm border outline-none"
-                  style={{
-                    borderColor: colors.border,
-                    borderRadius: "4px",
-                    color: colors.heading,
-                  }}
+                  className="w-full px-3 py-2 text-sm border border-border rounded outline-none text-heading"
                 />
               </div>
 
               {/* Apply/Clear buttons */}
               <div className="flex items-end gap-2">
                 <button
-                  onClick={fetchProducts}
-                  className="flex-1 px-4 py-2 text-sm font-medium transition-colors"
-                  style={{
-                    backgroundColor: colors.accent,
-                    color: colors.white,
-                    borderRadius: "4px",
-                  }}
+                  onClick={() => queryClient.invalidateQueries({ queryKey: ["products"] })}
+                  className="flex-1 px-4 py-2 text-sm font-medium transition-colors bg-accent text-white rounded hover:bg-accent-hover"
                 >
                   Apply
                 </button>
                 <button
                   onClick={clearFilters}
-                  className="px-4 py-2 text-sm border transition-colors hover:bg-gray-50"
-                  style={{
-                    borderColor: colors.border,
-                    color: colors.body,
-                    borderRadius: "4px",
-                  }}
+                  className="px-4 py-2 text-sm border border-border transition-colors hover:bg-stone-50 text-body rounded"
                 >
                   Clear
                 </button>
@@ -497,7 +384,7 @@ function ProductsContent() {
       {/* Results count */}
       <div className="max-w-7xl mx-auto px-4 py-4">
         {pagination && (
-          <p className="text-sm" style={{ color: colors.body }}>
+          <p className="text-sm text-body">
             Showing {products.length} of {pagination.total} products
           </p>
         )}
@@ -507,36 +394,20 @@ function ProductsContent() {
       <div className="max-w-7xl mx-auto px-4">
         {loading ? (
           <div className="flex items-center justify-center py-16">
-            <Loader2
-              size={32}
-              className="animate-spin"
-              style={{ color: colors.accent }}
-            />
+            <Loader2 size={32} className="animate-spin text-accent" />
           </div>
         ) : products.length === 0 ? (
           <div className="text-center py-16">
-            <Leaf
-              size={64}
-              className="mx-auto mb-4"
-              style={{ color: colors.border }}
-            />
-            <h2
-              className="text-xl font-bold mb-2"
-              style={{ color: colors.heading }}
-            >
+            <Leaf size={64} className="mx-auto mb-4 text-border" />
+            <h2 className="text-xl font-bold mb-2 text-heading">
               No products found
             </h2>
-            <p className="mb-6" style={{ color: colors.body }}>
+            <p className="mb-6 text-body">
               Try adjusting your filters or search criteria.
             </p>
             <button
               onClick={clearFilters}
-              className="px-6 py-2 text-sm font-medium"
-              style={{
-                backgroundColor: colors.accent,
-                color: colors.white,
-                borderRadius: "4px",
-              }}
+              className="px-6 py-2 text-sm font-medium bg-accent text-white rounded hover:bg-accent-hover"
             >
               Clear filters
             </button>
@@ -546,18 +417,10 @@ function ProductsContent() {
             {products.map((product) => (
               <div
                 key={product.id}
-                className="border overflow-hidden"
-                style={{
-                  backgroundColor: colors.white,
-                  borderColor: colors.border,
-                  borderRadius: "4px",
-                }}
+                className="border border-border overflow-hidden bg-white rounded"
               >
                 <Link href={`/products/${product.slug || product.id}`}>
-                  <div
-                    className="aspect-square relative"
-                    style={{ backgroundColor: "#f4f4f5" }}
-                  >
+                  <div className="aspect-square relative bg-stone-100">
                     {product.image ? (
                       <img
                         src={product.image}
@@ -566,18 +429,11 @@ function ProductsContent() {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <Leaf size={48} style={{ color: colors.border }} />
+                        <Leaf size={48} className="text-border" />
                       </div>
                     )}
                     {product.is_organic && (
-                      <div
-                        className="absolute top-2 right-2 px-2 py-1 text-xs font-medium"
-                        style={{
-                          backgroundColor: colors.successBg,
-                          color: colors.success,
-                          borderRadius: "4px",
-                        }}
-                      >
+                      <div className="absolute top-2 right-2 px-2 py-1 text-xs font-medium bg-success-bg text-success rounded">
                         Organic
                       </div>
                     )}
@@ -585,80 +441,50 @@ function ProductsContent() {
                 </Link>
                 <div className="p-3">
                   <Link href={`/products/${product.slug || product.id}`}>
-                    <h3
-                      className="font-medium text-sm mb-1 truncate hover:underline"
-                      style={{ color: colors.heading }}
-                    >
+                    <h3 className="font-medium text-sm mb-1 truncate hover:underline text-heading">
                       {product.name}
                     </h3>
                   </Link>
                   {product.farmer && (
-                    <p
-                      className="text-xs mb-2 flex items-center gap-1"
-                      style={{ color: colors.body }}
-                    >
+                    <p className="text-xs mb-2 flex items-center gap-1 text-body">
                       {product.farmer.name}
                       {product.farmer.is_verified && (
-                        <CheckCircle
-                          size={12}
-                          style={{ color: colors.success }}
-                        />
+                        <CheckCircle size={12} className="text-success" />
                       )}
                     </p>
                   )}
                   {product.rating !== null && product.rating > 0 && (
-                    <p
-                      className="text-xs mb-2 flex items-center gap-1"
-                      style={{ color: colors.body }}
-                    >
-                      <Star
-                        size={12}
-                        fill={colors.warning}
-                        style={{ color: colors.warning }}
-                      />
+                    <p className="text-xs mb-2 flex items-center gap-1 text-body">
+                      <Star size={12} className="text-warning fill-warning" />
                       {product.rating?.toFixed(1)} ({product.review_count})
                     </p>
                   )}
                   <div className="flex items-center justify-between gap-2">
-                    <p className="font-bold" style={{ color: colors.accent }}>
+                    <p className="font-bold text-accent">
                       {product.currency}{" "}
                       {Number(product.price).toLocaleString()}
-                      <span
-                        className="text-xs font-normal"
-                        style={{ color: colors.body }}
-                      >
+                      <span className="text-xs font-normal text-body">
                         /{product.unit}
                       </span>
                     </p>
                     <button
                       onClick={() => addToCart(product.id)}
-                      disabled={addingToCart === product.id}
-                      className="relative p-2 border transition-colors hover:bg-green-50 hover:border-green-600 disabled:opacity-50"
-                      style={{
-                        borderColor: cartQuantities[product.id] ? colors.accent : colors.border,
-                        backgroundColor: cartQuantities[product.id] ? colors.successBg : "transparent",
-                        borderRadius: "4px",
-                      }}
-                      title={cartQuantities[product.id] ? `${cartQuantities[product.id]} in cart` : "Add to cart"}
+                      disabled={addToCartMutation.isPending && addToCartMutation.variables === product.id}
+                      className={`relative p-2 border transition-colors rounded disabled:opacity-50 ${
+                        cartItemsMap[product.id] 
+                          ? "border-accent bg-success-bg hover:bg-success-bg" 
+                          : "border-border hover:bg-stone-50 hover:border-accent"
+                      }`}
+                      title={cartItemsMap[product.id] ? `${cartItemsMap[product.id]} in cart` : "Add to cart"}
                     >
-                      {addingToCart === product.id ? (
-                        <Loader2
-                          size={16}
-                          className="animate-spin"
-                          style={{ color: colors.accent }}
-                        />
+                      {addToCartMutation.isPending && addToCartMutation.variables === product.id ? (
+                        <Loader2 size={16} className="animate-spin text-accent" />
                       ) : (
-                        <ShoppingCart
-                          size={16}
-                          style={{ color: colors.accent }}
-                        />
+                        <ShoppingCart size={16} className="text-accent" />
                       )}
-                      {cartQuantities[product.id] > 0 && (
-                        <span
-                          className="absolute -top-1.5 -right-1.5 w-4 h-4 flex items-center justify-center text-[9px] font-bold text-white"
-                          style={{ backgroundColor: colors.accent, borderRadius: "50%" }}
-                        >
-                          {cartQuantities[product.id] > 9 ? "9+" : cartQuantities[product.id]}
+                      {cartItemsMap[product.id] > 0 && (
+                        <span className="absolute -top-1.5 -right-1.5 w-4 h-4 flex items-center justify-center text-[9px] font-bold text-white bg-accent rounded-full">
+                          {cartItemsMap[product.id] > 9 ? "9+" : cartItemsMap[product.id]}
                         </span>
                       )}
                     </button>
@@ -675,13 +501,9 @@ function ProductsContent() {
             <button
               onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
               disabled={currentPage === 1}
-              className="p-2 border transition-colors hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{
-                borderColor: colors.border,
-                borderRadius: "4px",
-              }}
+              className="p-2 border border-border rounded transition-colors hover:bg-stone-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <ChevronLeft size={18} style={{ color: colors.heading }} />
+              <ChevronLeft size={18} className="text-heading" />
             </button>
 
             {Array.from(
@@ -702,16 +524,11 @@ function ProductsContent() {
                   <button
                     key={pageNum}
                     onClick={() => setCurrentPage(pageNum)}
-                    className="w-10 h-10 text-sm font-medium border transition-colors"
-                    style={{
-                      borderColor:
-                        currentPage === pageNum ? colors.accent : colors.border,
-                      backgroundColor:
-                        currentPage === pageNum ? colors.accent : colors.white,
-                      color:
-                        currentPage === pageNum ? colors.white : colors.heading,
-                      borderRadius: "4px",
-                    }}
+                    className={`w-10 h-10 text-sm font-medium border rounded transition-colors ${
+                      currentPage === pageNum
+                        ? "border-accent bg-accent text-white"
+                        : "border-border bg-white text-heading hover:bg-stone-50"
+                    }`}
                   >
                     {pageNum}
                   </button>
@@ -726,13 +543,9 @@ function ProductsContent() {
                 )
               }
               disabled={currentPage === pagination.total_pages}
-              className="p-2 border transition-colors hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{
-                borderColor: colors.border,
-                borderRadius: "4px",
-              }}
+              className="p-2 border border-border rounded transition-colors hover:bg-stone-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <ChevronRight size={18} style={{ color: colors.heading }} />
+              <ChevronRight size={18} className="text-heading" />
             </button>
           </div>
         )}
@@ -745,15 +558,8 @@ export default function ProductsPage() {
   return (
     <Suspense
       fallback={
-        <div
-          className="min-h-screen flex items-center justify-center"
-          style={{ backgroundColor: colors.background }}
-        >
-          <Loader2
-            size={32}
-            className="animate-spin"
-            style={{ color: colors.accent }}
-          />
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <Loader2 size={32} className="animate-spin text-accent" />
         </div>
       }
     >

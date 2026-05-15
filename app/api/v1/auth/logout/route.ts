@@ -1,8 +1,9 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
-import { verifyAuth } from "@/lib/auth";
-import { handleRouteError } from "@/lib/errors";
-import { successResponse } from "@/lib/helpers/response";
+import { handleRouteError } from "@/core/errors";
+import { successResponse } from "@/core/helpers/response";
+import { verifyAuth } from "@/features/auth";
+import { LogoutUseCase } from "@/features/auth/application/use-cases/logout.use-case";
+import { authRepository } from "@/features/auth/infrastructure/repositories/prisma-auth.repository";
 
 /**
  * @swagger
@@ -39,22 +40,11 @@ export async function POST(request: NextRequest) {
   try {
     const payload = await verifyAuth(request);
 
-    // Delete all refresh tokens for this user
-    await prisma.refreshToken.deleteMany({
-      where: { userId: payload.userId },
-    });
+    const useCase = new LogoutUseCase(authRepository);
+    await useCase.execute(payload.userId);
 
-    // Update user online status
-    await prisma.user.update({
-      where: { id: payload.userId },
-      data: { isOnline: false, lastSeen: new Date() },
-    });
+    const response = successResponse(undefined, { message: "Logged out successfully" });
 
-    const response = successResponse(undefined, {
-      message: "Logged out successfully",
-    });
-
-    // Clear the refresh token cookie
     response.cookies.set("refresh_token", "", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",

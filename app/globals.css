@@ -1,8 +1,19 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #FAFAF9;
+  --foreground: #18181b;
+  
+  /* Design System Colors */
+  --color-harvest-white: #FFFFFF;
+  --color-harvest-heading: #18181b;
+  --color-harvest-body: #475569;
+  --color-harvest-accent: #166534;
+  --color-harvest-accent-hover: #14532d;
+  --color-harvest-border: #E4E4E7;
+  --color-harvest-success: #16a34a;
+  --color-harvest-success-bg: #dcfce7;
+  --color-harvest-error: #dc2626;
 }
 
 @theme inline {
@@ -10,6 +21,16 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  
+  --color-white: var(--color-harvest-white);
+  --color-heading: var(--color-harvest-heading);
+  --color-body: var(--color-harvest-body);
+  --color-accent: var(--color-harvest-accent);
+  --color-accent-hover: var(--color-harvest-accent-hover);
+  --color-border: var(--color-harvest-border);
+  --color-success: var(--color-harvest-success);
+  --color-success-bg: var(--color-harvest-success-bg);
+  --color-error: var(--color-harvest-error);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -22,5 +43,4 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
 }

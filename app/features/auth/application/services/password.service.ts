@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { AUTH } from "@/config/constants";
+import { AUTH } from "@/core/config/constants";
 
 /**
  * Hash a password using bcrypt.

@@ -1,14 +1,10 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
-import {
-  verifyToken,
-  signAccessToken,
-  signRefreshToken,
-  getRefreshTokenExpiry,
-} from "@/lib/auth";
-import { AppError, handleRouteError } from "@/lib/errors";
-import { successResponse } from "@/lib/helpers/response";
-import { AUTH } from "@/config/constants";
+import { handleRouteError } from "@/core/errors";
+import { successResponse } from "@/core/helpers/response";
+import { AUTH } from "@/core/config/constants";
+import { RefreshTokenUseCase } from "@/features/auth/application/use-cases/refresh-token.use-case";
+import { authRepository } from "@/features/auth/infrastructure/repositories/prisma-auth.repository";
+import { AppError } from "@/core/errors";
 
 /**
  * @swagger
@@ -64,67 +60,19 @@ import { AUTH } from "@/config/constants";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    let refreshTokenValue = body.refresh_token;
-
-    // If no token in body, try to get from cookie
-    if (!refreshTokenValue) {
-      refreshTokenValue = request.cookies.get("refresh_token")?.value;
-    }
+    const refreshTokenValue =
+      body.refresh_token ?? request.cookies.get("refresh_token")?.value;
 
     if (!refreshTokenValue) {
       throw AppError.badRequest("Refresh token is required");
     }
 
-    // Verify the refresh token
-    const payload = await verifyToken(refreshTokenValue);
+    const useCase = new RefreshTokenUseCase(authRepository);
+    const result = await useCase.execute(refreshTokenValue);
 
-    if (!payload || payload.type !== "refresh") {
-      throw AppError.unauthorized("Invalid refresh token");
-    }
+    const response = successResponse(result);
 
-    // Check if refresh token exists in database and is not expired
-    const storedToken = await prisma.refreshToken.findUnique({
-      where: { token: refreshTokenValue },
-      include: { user: true },
-    });
-
-    if (!storedToken) {
-      throw AppError.unauthorized("Refresh token not found");
-    }
-
-    if (storedToken.expiresAt < new Date()) {
-      await prisma.refreshToken.delete({ where: { id: storedToken.id } });
-      throw AppError.unauthorized("Refresh token expired");
-    }
-
-    // Generate new tokens
-    const newAccessToken = await signAccessToken(
-      storedToken.user.id,
-      storedToken.user.userType,
-    );
-    const newRefreshToken = await signRefreshToken(
-      storedToken.user.id,
-      storedToken.user.userType,
-    );
-
-    // Update refresh token in database (rotate token)
-    await prisma.refreshToken.update({
-      where: { id: storedToken.id },
-      data: {
-        token: newRefreshToken,
-        expiresAt: getRefreshTokenExpiry(),
-      },
-    });
-
-    const response = successResponse({
-      access_token: newAccessToken,
-      refresh_token: newRefreshToken,
-      token_type: "Bearer",
-      expires_in: AUTH.ACCESS_TOKEN_EXPIRES_IN,
-    });
-
-    // Update the refresh token cookie
-    response.cookies.set("refresh_token", newRefreshToken, {
+    response.cookies.set("refresh_token", result.refresh_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",

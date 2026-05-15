@@ -1,6 +1,3 @@
-export { LoginSchema, RegisterSchema } from "./schemas/auth.schema";
-export type { LoginInput, RegisterInput } from "./schemas/auth.schema";
-
 export { CreateOrderSchema } from "./schemas/order.schema";
 export type { CreateOrderInput } from "./schemas/order.schema";
 

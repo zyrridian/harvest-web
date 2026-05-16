@@ -1,8 +1,9 @@
 import { NextRequest } from "next/server";
-import prisma from "@/core/database/prisma";
 import { verifyAuth } from "@/features/auth";
-import { AppError, handleRouteError } from "@/core/errors";
+import { handleRouteError } from "@/core/errors";
 import { successResponse } from "@/core/helpers/response";
+import { GetCurrentUserUseCase } from "@/features/auth/application/usecases/get-current-user.usecase";
+import { authRepository } from "@/features/auth/infrastructure/repositories/prisma-auth.repository";
 
 /**
  * @swagger
@@ -37,28 +38,9 @@ import { successResponse } from "@/core/helpers/response";
 export async function GET(request: NextRequest) {
   try {
     const payload = await verifyAuth(request);
-
-    const user = await prisma.user.findUnique({
-      where: { id: payload.userId },
-    });
-
-    if (!user) {
-      throw AppError.notFound("User not found");
-    }
-
-    return successResponse({
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      phone_number: user.phoneNumber,
-      avatar_url: user.avatarUrl,
-      user_type: user.userType,
-      is_verified: user.isVerified,
-      is_online: user.isOnline,
-      last_seen: user.lastSeen?.toISOString() || null,
-      created_at: user.createdAt.toISOString(),
-      updated_at: user.updatedAt.toISOString(),
-    });
+    const useCase = new GetCurrentUserUseCase(authRepository);
+    const user = await useCase.execute(payload.userId);
+    return successResponse(user);
   } catch (error) {
     return handleRouteError(error, "Get me");
   }

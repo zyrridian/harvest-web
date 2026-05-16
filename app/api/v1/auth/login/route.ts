@@ -1,16 +1,11 @@
 import { NextRequest } from "next/server";
-import prisma from "@/core/database/prisma";
-import {
-  comparePassword,
-  signAccessToken,
-  signRefreshToken,
-  getRefreshTokenExpiry,
-} from "@/features/auth";
-import { AppError, handleRouteError } from "@/core/errors";
+import { handleRouteError } from "@/core/errors";
 import { successResponse } from "@/core/helpers/response";
 import { parseBody } from "@/core/helpers/parseBody";
 import { LoginSchema } from "@/core/validation";
 import { AUTH } from "@/core/config/constants";
+import { LoginUseCase } from "@/features/auth/application/usecases/login.usecase";
+import { authRepository } from "@/features/auth/infrastructure/repositories/prisma-auth.repository";
 
 /**
  * @swagger
@@ -46,57 +41,14 @@ import { AUTH } from "@/core/config/constants";
 export async function POST(request: NextRequest) {
   try {
     const body = await parseBody(request);
-    const { email, password } = LoginSchema.parse(body);
+    const input = LoginSchema.parse(body);
 
-    // Find user by email
-    const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
-    });
+    const useCase = new LoginUseCase(authRepository);
+    const result = await useCase.execute(input);
 
-    if (!user || !(await comparePassword(password, user.password))) {
-      throw AppError.unauthorized("Invalid credentials");
-    }
+    const response = successResponse(result);
 
-    // Update user online status
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { isOnline: true, lastSeen: new Date() },
-    });
-
-    // Generate tokens
-    const accessToken = await signAccessToken(user.id, user.userType);
-    const refreshToken = await signRefreshToken(user.id, user.userType);
-
-    // Store refresh token (delete old ones first)
-    await prisma.refreshToken.deleteMany({ where: { userId: user.id } });
-    await prisma.refreshToken.create({
-      data: {
-        userId: user.id,
-        token: refreshToken,
-        expiresAt: getRefreshTokenExpiry(),
-      },
-    });
-
-    const response = successResponse({
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        phone_number: user.phoneNumber,
-        avatar_url: user.avatarUrl,
-        user_type: user.userType,
-        is_verified: user.isVerified,
-        created_at: user.createdAt.toISOString(),
-        updated_at: user.updatedAt.toISOString(),
-      },
-      access_token: accessToken,
-      refresh_token: refreshToken,
-      token_type: "Bearer",
-      expires_in: AUTH.ACCESS_TOKEN_EXPIRES_IN,
-    });
-
-    // Set refresh token as HTTP-only cookie for web clients
-    response.cookies.set("refresh_token", refreshToken, {
+    response.cookies.set("refresh_token", result.refresh_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",

@@ -1,7 +1,10 @@
 import { NextRequest } from "next/server";
 import { TokenPayload } from "@/core/types/auth";
 import { AppError } from "@/core/errors";
-import { extractBearerToken, verifyToken } from "./tokens";
+import {
+  extractBearerToken,
+  verifyToken,
+} from "@/features/auth/application/services/token.service";
 
 /**
  * Verify authentication from a NextRequest.

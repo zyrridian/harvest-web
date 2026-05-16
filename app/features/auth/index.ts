@@ -5,11 +5,14 @@ export {
   verifyToken,
   getRefreshTokenExpiry,
   extractBearerToken,
-} from "./tokens";
+} from "./application/services/token.service";
 
-export { hashPassword, comparePassword } from "./password";
+export {
+  hashPassword,
+  comparePassword,
+} from "./application/services/password.service";
 
-export { verifyAuth, verifyAdmin } from "./guards";
+export { verifyAuth, verifyAdmin } from "./infrastructure/guards/auth.guard";
 
 // Re-export the TokenPayload type for convenience
 export type { TokenPayload } from "@/core/types/auth";

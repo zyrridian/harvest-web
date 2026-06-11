@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { verifyToken, extractBearerToken } from "@/lib/auth";
+import prisma from "@/core/database/prisma";
+import { verifyToken, extractBearerToken } from "@/features/auth";
 
 /**
  * @swagger
@@ -26,19 +26,19 @@ import { verifyToken, extractBearerToken } from "@/lib/auth";
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-        // Await params in Next.js 15+
+    // Await params in Next.js 15+
     const { id } = await params;
 
-// Verify authentication
+    // Verify authentication
     const authHeader = request.headers.get("authorization");
     const token = extractBearerToken(authHeader);
     if (!token) {
       return NextResponse.json(
         { status: "error", message: "Unauthorized" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -46,7 +46,7 @@ export async function GET(
     if (!payload) {
       return NextResponse.json(
         { status: "error", message: "Invalid token" },
-        { status: 401 }
+        { status: 401 },
       );
     }
     const userId = payload.userId as string;
@@ -80,7 +80,7 @@ export async function GET(
     if (!order) {
       return NextResponse.json(
         { status: "error", message: "Order not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -88,7 +88,7 @@ export async function GET(
     if (order.buyerId !== userId && order.sellerId !== userId) {
       return NextResponse.json(
         { status: "error", message: "Unauthorized" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -169,7 +169,7 @@ export async function GET(
         message: "Failed to fetch order",
         error: error.message,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

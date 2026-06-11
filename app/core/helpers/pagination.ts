@@ -1,4 +1,4 @@
-import { PAGINATION } from "@/config/constants";
+import { PAGINATION } from "@/core/config/constants";
 
 export interface PaginationParams {
   page: number;
@@ -9,14 +9,19 @@ export interface PaginationParams {
 /**
  * Parse pagination query parameters with defaults and bounds.
  */
-export function parsePagination(searchParams: URLSearchParams): PaginationParams {
+export function parsePagination(
+  searchParams: URLSearchParams,
+): PaginationParams {
   const page = Math.max(
     1,
     parseInt(searchParams.get("page") || String(PAGINATION.DEFAULT_PAGE)),
   );
   const limit = Math.min(
     PAGINATION.MAX_LIMIT,
-    Math.max(1, parseInt(searchParams.get("limit") || String(PAGINATION.DEFAULT_LIMIT))),
+    Math.max(
+      1,
+      parseInt(searchParams.get("limit") || String(PAGINATION.DEFAULT_LIMIT)),
+    ),
   );
   const skip = (page - 1) * limit;
 

@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
-import { verifyAuth } from "@/lib/auth";
-import { AppError, handleRouteError } from "@/lib/errors";
-import { successResponse } from "@/lib/helpers/response";
+import prisma from "@/core/database/prisma";
+import { verifyAuth } from "@/features/auth";
+import { AppError, handleRouteError } from "@/core/errors";
+import { successResponse } from "@/core/helpers/response";
 
 // POST /api/v1/farmer/routes/[id]/location
 // Farmer pushes GPS update. Stores ephemeral current location on route.
@@ -10,12 +10,14 @@ import { successResponse } from "@/lib/helpers/response";
 // Body: { latitude, longitude, accuracy? }
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
     const payload = await verifyAuth(request);
-    const farmer = await prisma.farmer.findUnique({ where: { userId: payload.userId } });
+    const farmer = await prisma.farmer.findUnique({
+      where: { userId: payload.userId },
+    });
     if (!farmer) throw AppError.notFound("Farmer profile not found");
 
     const route = await prisma.deliveryRoute.findFirst({

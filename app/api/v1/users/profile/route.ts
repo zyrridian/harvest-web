@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { verifyToken, extractBearerToken } from "@/lib/auth";
+import prisma from "@/core/database/prisma";
+import { verifyToken, extractBearerToken } from "@/features/auth";
 
 /**
  * @swagger
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
     if (!token) {
       return NextResponse.json(
         { status: "error", message: "No token provided" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
     if (!payload || payload.type !== "access") {
       return NextResponse.json(
         { status: "error", message: "Invalid token" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
     if (!user) {
       return NextResponse.json(
         { status: "error", message: "User not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -118,7 +118,7 @@ export async function GET(request: NextRequest) {
     console.error("Get profile error:", error);
     return NextResponse.json(
       { status: "error", message: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -181,7 +181,7 @@ export async function PUT(request: NextRequest) {
     if (!token) {
       return NextResponse.json(
         { status: "error", message: "No token provided" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -191,7 +191,7 @@ export async function PUT(request: NextRequest) {
     if (!payload || payload.type !== "access") {
       return NextResponse.json(
         { status: "error", message: "Invalid token" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -264,7 +264,7 @@ export async function PUT(request: NextRequest) {
     console.error("Update profile error:", error);
     return NextResponse.json(
       { status: "error", message: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

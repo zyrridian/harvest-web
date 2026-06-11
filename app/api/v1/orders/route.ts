@@ -1,12 +1,15 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
-import { verifyAuth } from "@/lib/auth";
-import { AppError, handleRouteError } from "@/lib/errors";
-import { successResponse } from "@/lib/helpers/response";
-import { parsePagination, buildPaginationMeta } from "@/lib/helpers/pagination";
-import { CreateOrderSchema } from "@/lib/validation";
-import { BUSINESS } from "@/config/constants";
-import { snap } from "@/lib/midtrans";
+import prisma from "@/core/database/prisma";
+import { verifyAuth } from "@/features/auth";
+import { AppError, handleRouteError } from "@/core/errors";
+import { successResponse } from "@/core/helpers/response";
+import {
+  parsePagination,
+  buildPaginationMeta,
+} from "@/core/helpers/pagination";
+import { CreateOrderSchema } from "@/core/validation";
+import { BUSINESS } from "@/core/config/constants";
+import { snap } from "@/core/services/midtrans";
 
 // Helper function to generate order number
 function generateOrderNumber(): string {
@@ -186,12 +189,13 @@ export async function POST(request: NextRequest) {
 
     // delivery_fee from client (already estimated/negotiated)
     // Fall back to constant only for home_delivery if not provided
-    const clientDeliveryFee = typeof provided_delivery_fee === "number" ? provided_delivery_fee : null;
+    const clientDeliveryFee =
+      typeof provided_delivery_fee === "number" ? provided_delivery_fee : null;
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw AppError.notFound("User not found");
     const isWholesale = user.isWholesale;
-    const orderLimit = isWholesale ? (user.wholesaleLimit || 9999) : 50;
+    const orderLimit = isWholesale ? user.wholesaleLimit || 9999 : 50;
 
     // Get cart items
     const cartItems = await prisma.cartItem.findMany({
@@ -233,8 +237,13 @@ export async function POST(request: NextRequest) {
           include: { deliverySettings: true },
         });
 
-        if (payment_method === "cod" && !farmer?.deliverySettings?.cashOnDeliveryEnabled) {
-          throw AppError.badRequest(`Cash on Delivery is not available for ${farmer?.name || "this farmer"}`);
+        if (
+          payment_method === "cod" &&
+          !farmer?.deliverySettings?.cashOnDeliveryEnabled
+        ) {
+          throw AppError.badRequest(
+            `Cash on Delivery is not available for ${farmer?.name || "this farmer"}`,
+          );
         }
 
         const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0);
@@ -258,12 +267,14 @@ export async function POST(request: NextRequest) {
         const totalAmount = subtotal + deliveryFee + serviceFee;
 
         const hasHarvestItems = items.some((item) => item.product.isHarvest);
-        
+
         // Validate harvest limits
         if (hasHarvestItems) {
           for (const item of items) {
             if (item.product.isHarvest && item.quantity > orderLimit) {
-              throw AppError.badRequest(`Harvest limit exceeded for ${item.product.name}. Limit is ${orderLimit}.`);
+              throw AppError.badRequest(
+                `Harvest limit exceeded for ${item.product.name}. Limit is ${orderLimit}.`,
+              );
             }
           }
         }
@@ -329,7 +340,7 @@ export async function POST(request: NextRequest) {
             if (item.product.isHarvest) {
               await tx.product.update({
                 where: { id: item.productId },
-                data: { currentBooked: { increment: item.quantity } }
+                data: { currentBooked: { increment: item.quantity } },
               });
             }
           }
@@ -340,7 +351,10 @@ export async function POST(request: NextRequest) {
     });
 
     const isCOD = payment_method === "cod";
-    const totalAmount = createdOrders.reduce((sum, order) => sum + order.total_amount, 0);
+    const totalAmount = createdOrders.reduce(
+      (sum, order) => sum + order.total_amount,
+      0,
+    );
 
     // Generate Midtrans Snap token for non-COD payments
     let snapToken: string | null = null;
@@ -372,13 +386,21 @@ export async function POST(request: NextRequest) {
             pending: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/checkout/success?orders=${orderIds}&total=${totalAmount}&method=${payment_method}&pending=1`,
           },
           // Allow all enabled Midtrans payment methods, or narrow by type
-          enabled_payments: payment_method === "bank_transfer"
-            ? ["bca_va", "bni_va", "bri_va", "permata_va", "mandiri_bill", "other_va"]
-            : payment_method === "e_wallet"
-            ? ["gopay", "shopeepay", "dana", "ovo", "qris"]
-            : payment_method === "credit_card"
-            ? ["credit_card"]
-            : undefined,
+          enabled_payments:
+            payment_method === "bank_transfer"
+              ? [
+                  "bca_va",
+                  "bni_va",
+                  "bri_va",
+                  "permata_va",
+                  "mandiri_bill",
+                  "other_va",
+                ]
+              : payment_method === "e_wallet"
+                ? ["gopay", "shopeepay", "dana", "ovo", "qris"]
+                : payment_method === "credit_card"
+                  ? ["credit_card"]
+                  : undefined,
         };
 
         const snapResponse = await snap.createTransaction(snapParameter);
@@ -389,7 +411,9 @@ export async function POST(request: NextRequest) {
         for (const o of createdOrders) {
           await prisma.order.update({
             where: { id: o.order_id },
-            data: { trackingNumber: snapParameter.transaction_details.order_id },
+            data: {
+              trackingNumber: snapParameter.transaction_details.order_id,
+            },
           });
         }
       } catch (err: any) {
@@ -409,21 +433,22 @@ export async function POST(request: NextRequest) {
           payment_method,
           payment_instructions: isCOD
             ? {
-                message: "Please prepare the exact amount to pay the farmer upon delivery.",
+                message:
+                  "Please prepare the exact amount to pay the farmer upon delivery.",
                 amount: totalAmount,
               }
             : snapToken
-            ? {
-                message: "Complete your payment via Midtrans.",
-                amount: totalAmount,
-              }
-            : {
-                bank_name: "Bank Mandiri",
-                account_number: "1234567890",
-                account_name: "Farm Market",
-                amount: totalAmount,
-                valid_until: new Date(Date.now() + 24 * 60 * 60 * 1000),
-              },
+              ? {
+                  message: "Complete your payment via Midtrans.",
+                  amount: totalAmount,
+                }
+              : {
+                  bank_name: "Bank Mandiri",
+                  account_number: "1234567890",
+                  account_name: "Farm Market",
+                  amount: totalAmount,
+                  valid_until: new Date(Date.now() + 24 * 60 * 60 * 1000),
+                },
         },
       },
       { message: "Order created successfully", status: 201 },

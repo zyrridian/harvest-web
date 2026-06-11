@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { coreApi, MIDTRANS_SERVER_KEY } from "@/lib/midtrans";
+import prisma from "@/core/database/prisma";
+import { coreApi, MIDTRANS_SERVER_KEY } from "@/core/services/midtrans";
 import crypto from "crypto";
 
 /**
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     const {
-      order_id,          // e.g. "HARVEST-FM20260503ABCDEF-1746266400000"
+      order_id, // e.g. "HARVEST-FM20260503ABCDEF-1746266400000"
       transaction_status,
       fraud_status,
       gross_amount,
@@ -29,7 +29,10 @@ export async function POST(request: NextRequest) {
 
     if (signature_key !== expectedSignature) {
       console.warn("Midtrans: invalid signature", { order_id });
-      return NextResponse.json({ status: "error", message: "Invalid signature" }, { status: 401 });
+      return NextResponse.json(
+        { status: "error", message: "Invalid signature" },
+        { status: 401 },
+      );
     }
 
     // --- Map Midtrans status to our payment/order status ---
@@ -50,7 +53,11 @@ export async function POST(request: NextRequest) {
       paymentStatus = "paid";
       orderStatus = "confirmed";
       paidAt = new Date();
-    } else if (transaction_status === "cancel" || transaction_status === "deny" || transaction_status === "expire") {
+    } else if (
+      transaction_status === "cancel" ||
+      transaction_status === "deny" ||
+      transaction_status === "expire"
+    ) {
       paymentStatus = "failed";
       orderStatus = "cancelled";
     } else if (transaction_status === "pending") {
@@ -80,11 +87,16 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    console.log(`Midtrans: updated ${orders.length} order(s) for ${order_id} → ${paymentStatus}`);
+    console.log(
+      `Midtrans: updated ${orders.length} order(s) for ${order_id} → ${paymentStatus}`,
+    );
 
     return NextResponse.json({ status: "ok" });
   } catch (error: any) {
     console.error("Midtrans notification error:", error);
-    return NextResponse.json({ status: "error", message: error.message }, { status: 500 });
+    return NextResponse.json(
+      { status: "error", message: error.message },
+      { status: 500 },
+    );
   }
 }

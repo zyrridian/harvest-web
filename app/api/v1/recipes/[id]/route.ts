@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
-import { AppError, handleRouteError } from "@/lib/errors";
-import { successResponse } from "@/lib/helpers/response";
+import prisma from "@/core/database/prisma";
+import { AppError, handleRouteError } from "@/core/errors";
+import { successResponse } from "@/core/helpers/response";
 
 /**
  * GET /api/v1/recipes/[id]
@@ -9,7 +9,7 @@ import { successResponse } from "@/lib/helpers/response";
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
@@ -23,11 +23,11 @@ export async function GET(
         ingredients: {
           include: {
             product: {
-              select: { 
-                id: true, 
-                name: true, 
-                price: true, 
-                images: { take: 1, select: { url: true } }
+              select: {
+                id: true,
+                name: true,
+                price: true,
+                images: { take: 1, select: { url: true } },
               },
             },
           },

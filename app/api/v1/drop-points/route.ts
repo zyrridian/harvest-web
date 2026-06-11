@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import prisma from "@/core/database/prisma";
 
 /**
  * GET /api/v1/drop-points
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
     console.error("GET drop-points error:", error);
     return NextResponse.json(
       { status: "error", message: "Failed to fetch drop points" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -1,12 +1,14 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
-import { AppError, handleRouteError } from "@/lib/errors";
-import { successResponse } from "@/lib/helpers/response";
+import prisma from "@/core/database/prisma";
+import { AppError, handleRouteError } from "@/core/errors";
+import { successResponse } from "@/core/helpers/response";
 
 // Haversine distance in km
 function haversineKm(
-  lat1: number, lon1: number,
-  lat2: number, lon2: number
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
 ): number {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -78,8 +80,10 @@ export async function GET(request: NextRequest) {
     if (!farmer) throw AppError.notFound("Farmer not found");
 
     const hasCoords =
-      address.latitude && address.longitude &&
-      farmer.latitude && farmer.longitude;
+      address.latitude &&
+      address.longitude &&
+      farmer.latitude &&
+      farmer.longitude;
 
     const distanceKm = hasCoords
       ? haversineKm(
@@ -104,9 +108,13 @@ export async function GET(request: NextRequest) {
       method: "third_party",
       name: "Third Party Delivery",
       description: "JNE / Sicepat",
-      fee: distanceKm !== null ? estimateThirdPartyFee(distanceKm).options[0].fee : 15000,
+      fee:
+        distanceKm !== null
+          ? estimateThirdPartyFee(distanceKm).options[0].fee
+          : 15000,
       distance_km: distanceKm,
-      services: distanceKm !== null ? estimateThirdPartyFee(distanceKm).options : null,
+      services:
+        distanceKm !== null ? estimateThirdPartyFee(distanceKm).options : null,
       note: "Prices are estimates. Actual fee set by courier at pickup.",
     };
 

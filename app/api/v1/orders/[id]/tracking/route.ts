@@ -1,12 +1,14 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
-import { verifyAuth } from "@/lib/auth";
-import { AppError, handleRouteError } from "@/lib/errors";
-import { successResponse } from "@/lib/helpers/response";
+import prisma from "@/core/database/prisma";
+import { verifyAuth } from "@/features/auth";
+import { AppError, handleRouteError } from "@/core/errors";
+import { successResponse } from "@/core/helpers/response";
 
 function haversineKm(
-  lat1: number, lon1: number,
-  lat2: number, lon2: number
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
 ): number {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -23,7 +25,11 @@ function haversineKm(
 // Above → show blurred position (shifted ~500m in random stable direction).
 const FUZZY_THRESHOLD_KM = 2;
 
-function fuzzLocation(lat: number, lng: number, orderId: string): { lat: number; lng: number } {
+function fuzzLocation(
+  lat: number,
+  lng: number,
+  orderId: string,
+): { lat: number; lng: number } {
   // Deterministic fuzz: use orderId hash as stable offset seed
   // Offset ~0.004° ≈ 400-500m
   const seed = orderId.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
@@ -37,7 +43,7 @@ function fuzzLocation(lat: number, lng: number, orderId: string): { lat: number;
 // Applies fuzzy location unless farmer is within 2km of buyer.
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
@@ -111,10 +117,20 @@ export async function GET(
     const buyerLat = order.deliveryAddress?.latitude;
     const buyerLng = order.deliveryAddress?.longitude;
 
-    let liveLocation: { lat: number; lng: number; is_exact: boolean; updated_at: Date | null };
+    let liveLocation: {
+      lat: number;
+      lng: number;
+      is_exact: boolean;
+      updated_at: Date | null;
+    };
 
     if (buyerLat && buyerLng) {
-      const distKm = haversineKm(route.currentLat, route.currentLng, buyerLat, buyerLng);
+      const distKm = haversineKm(
+        route.currentLat,
+        route.currentLng,
+        buyerLat,
+        buyerLng,
+      );
       const isExact = distKm <= FUZZY_THRESHOLD_KM;
 
       if (isExact) {
@@ -125,7 +141,11 @@ export async function GET(
           updated_at: route.locationUpdatedAt,
         };
       } else {
-        const fuzzy = fuzzLocation(route.currentLat, route.currentLng, order.id);
+        const fuzzy = fuzzLocation(
+          route.currentLat,
+          route.currentLng,
+          order.id,
+        );
         liveLocation = {
           lat: fuzzy.lat,
           lng: fuzzy.lng,
@@ -147,7 +167,11 @@ export async function GET(
     // Get stop position in route (how many stops ahead)
     const myStopOrder = order.routeStop.stopOrder;
     const allStops = await prisma.routeStop.findMany({
-      where: { routeId: route.id, stopOrder: { lt: myStopOrder }, status: { not: "completed" } },
+      where: {
+        routeId: route.id,
+        stopOrder: { lt: myStopOrder },
+        status: { not: "completed" },
+      },
     });
 
     return successResponse({

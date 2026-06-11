@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
-import { verifyAuth } from "@/lib/auth";
-import { AppError, handleRouteError } from "@/lib/errors";
-import { successResponse } from "@/lib/helpers/response";
+import prisma from "@/core/database/prisma";
+import { verifyAuth } from "@/features/auth";
+import { AppError, handleRouteError } from "@/core/errors";
+import { successResponse } from "@/core/helpers/response";
 
 /**
  * @swagger
@@ -27,14 +27,22 @@ export async function POST(
     const existingLike = await prisma.commentLike.findUnique({
       where: { commentId_userId: { commentId: id, userId: user.userId } },
     });
-    if (existingLike) throw AppError.badRequest("You have already liked this comment");
+    if (existingLike)
+      throw AppError.badRequest("You have already liked this comment");
 
     await prisma.$transaction([
-      prisma.commentLike.create({ data: { commentId: id, userId: user.userId } }),
-      prisma.postComment.update({ where: { id }, data: { likesCount: { increment: 1 } } }),
+      prisma.commentLike.create({
+        data: { commentId: id, userId: user.userId },
+      }),
+      prisma.postComment.update({
+        where: { id },
+        data: { likesCount: { increment: 1 } },
+      }),
     ]);
 
-    return successResponse(undefined, { message: "Comment liked successfully" });
+    return successResponse(undefined, {
+      message: "Comment liked successfully",
+    });
   } catch (error) {
     return handleRouteError(error, "Like comment");
   }
@@ -63,14 +71,22 @@ export async function DELETE(
     const existingLike = await prisma.commentLike.findUnique({
       where: { commentId_userId: { commentId: id, userId: user.userId } },
     });
-    if (!existingLike) throw AppError.badRequest("You have not liked this comment");
+    if (!existingLike)
+      throw AppError.badRequest("You have not liked this comment");
 
     await prisma.$transaction([
-      prisma.commentLike.delete({ where: { commentId_userId: { commentId: id, userId: user.userId } } }),
-      prisma.postComment.update({ where: { id }, data: { likesCount: { decrement: 1 } } }),
+      prisma.commentLike.delete({
+        where: { commentId_userId: { commentId: id, userId: user.userId } },
+      }),
+      prisma.postComment.update({
+        where: { id },
+        data: { likesCount: { decrement: 1 } },
+      }),
     ]);
 
-    return successResponse(undefined, { message: "Comment unliked successfully" });
+    return successResponse(undefined, {
+      message: "Comment unliked successfully",
+    });
   } catch (error) {
     return handleRouteError(error, "Unlike comment");
   }

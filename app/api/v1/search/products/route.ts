@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAuth } from "@/lib/auth";
-import prisma from "@/lib/prisma";
+import { verifyAuth } from "@/features/auth";
+import prisma from "@/core/database/prisma";
 
 /**
  * @swagger
@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
     if (!query || query.trim() === "") {
       return NextResponse.json(
         { status: "error", message: "Search query is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -220,7 +220,7 @@ export async function GET(request: NextRequest) {
     console.error("Search products error:", error);
     return NextResponse.json(
       { status: "error", message: "Failed to search products" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

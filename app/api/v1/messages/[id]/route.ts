@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAuth } from "@/lib/auth";
-import prisma from "@/lib/prisma";
+import { verifyAuth } from "@/features/auth";
+import prisma from "@/core/database/prisma";
 
 /**
  * @swagger
@@ -42,13 +42,13 @@ import prisma from "@/lib/prisma";
  */
 export async function PUT(
   request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
-        // Await params in Next.js 15+
+    // Await params in Next.js 15+
     const { id } = await context.params;
 
-const payload = await verifyAuth(request);
+    const payload = await verifyAuth(request);
     const { id: messageId } = await context.params;
     const body = await request.json();
 
@@ -57,7 +57,7 @@ const payload = await verifyAuth(request);
     if (!content || content.trim() === "") {
       return NextResponse.json(
         { status: "error", message: "Message content is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -69,14 +69,14 @@ const payload = await verifyAuth(request);
     if (!message) {
       return NextResponse.json(
         { status: "error", message: "Message not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     if (message.senderId !== payload.userId) {
       return NextResponse.json(
         { status: "error", message: "Unauthorized to edit this message" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -104,7 +104,7 @@ const payload = await verifyAuth(request);
     console.error("Edit message error:", error);
     return NextResponse.json(
       { status: "error", message: "Failed to edit message" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -143,7 +143,7 @@ const payload = await verifyAuth(request);
  */
 export async function DELETE(
   request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
     const payload = await verifyAuth(request);
@@ -163,7 +163,7 @@ export async function DELETE(
     if (!message) {
       return NextResponse.json(
         { status: "error", message: "Message not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -176,7 +176,7 @@ export async function DELETE(
     if (!isParticipant) {
       return NextResponse.json(
         { status: "error", message: "Unauthorized" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -185,7 +185,7 @@ export async function DELETE(
       if (!isSender) {
         return NextResponse.json(
           { status: "error", message: "Only sender can delete for everyone" },
-          { status: 403 }
+          { status: 403 },
         );
       }
 
@@ -216,7 +216,7 @@ export async function DELETE(
     console.error("Delete message error:", error);
     return NextResponse.json(
       { status: "error", message: "Failed to delete message" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

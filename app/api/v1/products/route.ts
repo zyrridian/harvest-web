@@ -1,8 +1,11 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
-import { handleRouteError } from "@/lib/errors";
-import { successResponse } from "@/lib/helpers/response";
-import { parsePagination, buildPaginationMeta } from "@/lib/helpers/pagination";
+import prisma from "@/core/database/prisma";
+import { handleRouteError } from "@/core/errors";
+import { successResponse } from "@/core/helpers/response";
+import {
+  parsePagination,
+  buildPaginationMeta,
+} from "@/core/helpers/pagination";
 
 /**
  * @swagger
@@ -85,10 +88,13 @@ export async function GET(request: NextRequest) {
     }
 
     const orderBy: Record<string, string> =
-      sortBy === "price" ? { price: order } :
-      sortBy === "rating" ? { rating: order } :
-      sortBy === "popular" ? { viewCount: order } :
-      { createdAt: order };
+      sortBy === "price"
+        ? { price: order }
+        : sortBy === "rating"
+          ? { rating: order }
+          : sortBy === "popular"
+            ? { viewCount: order }
+            : { createdAt: order };
 
     const [products, totalItems] = await Promise.all([
       prisma.product.findMany({
@@ -99,10 +105,18 @@ export async function GET(request: NextRequest) {
         include: {
           category: { select: { id: true, name: true, slug: true } },
           seller: { select: { id: true, name: true, avatarUrl: true } },
-          images: { where: { isPrimary: true }, take: 1, select: { url: true, thumbnailUrl: true } },
+          images: {
+            where: { isPrimary: true },
+            take: 1,
+            select: { url: true, thumbnailUrl: true },
+          },
           tags: { select: { tag: true } },
           discounts: {
-            where: { isActive: true, validFrom: { lte: new Date() }, validUntil: { gte: new Date() } },
+            where: {
+              isActive: true,
+              validFrom: { lte: new Date() },
+              validUntil: { gte: new Date() },
+            },
             take: 1,
             orderBy: { value: "desc" },
           },
@@ -114,7 +128,12 @@ export async function GET(request: NextRequest) {
     const sellerIds = [...new Set(products.map((p) => p.sellerId))];
     const farmers = await prisma.farmer.findMany({
       where: { userId: { in: sellerIds } },
-      select: { userId: true, name: true, profileImage: true, isVerified: true },
+      select: {
+        userId: true,
+        name: true,
+        profileImage: true,
+        isVerified: true,
+      },
     });
     const farmerMap = new Map(farmers.map((f) => [f.userId, f]));
 
@@ -138,13 +157,23 @@ export async function GET(request: NextRequest) {
         is_available: product.isAvailable,
         stock_quantity: product.stockQuantity,
         discount: activeDiscount
-          ? activeDiscount.type === "percentage" ? activeDiscount.value : null
+          ? activeDiscount.type === "percentage"
+            ? activeDiscount.value
+            : null
           : null,
         rating: product.rating,
         review_count: product.reviewCount,
         farmer: farmer
-          ? { name: farmer.name, profile_image: farmer.profileImage, is_verified: farmer.isVerified }
-          : { name: product.seller.name, profile_image: product.seller.avatarUrl, is_verified: false },
+          ? {
+              name: farmer.name,
+              profile_image: farmer.profileImage,
+              is_verified: farmer.isVerified,
+            }
+          : {
+              name: product.seller.name,
+              profile_image: product.seller.avatarUrl,
+              is_verified: false,
+            },
         is_harvest: product.isHarvest,
         target_amount: product.targetAmount,
         current_booked: product.currentBooked,

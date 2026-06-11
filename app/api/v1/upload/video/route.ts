@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { verifyAuth } from "@/lib/auth";
+import prisma from "@/core/database/prisma";
+import { verifyAuth } from "@/features/auth";
 
 /**
  * @swagger
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
           message:
             "Missing required fields: url, file_name, file_size, mime_type",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
         message: "Video uploaded successfully",
         data: video,
       },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (error: any) {
     console.error("Upload video error:", error);
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
         status: "error",
         message: error.message || "Failed to upload video",
       },
-      { status: error.status || 500 }
+      { status: error.status || 500 },
     );
   }
 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import prisma from "@/core/database/prisma";
 import { nanoid } from "nanoid";
 
 /**
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
           status: "error",
           message: "Missing required fields: reference_type, reference_id",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
           share_count: shareLink.shareCount,
         },
       },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (error: any) {
     console.error("Generate share link error:", error);
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
         status: "error",
         message: error.message || "Failed to generate share link",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

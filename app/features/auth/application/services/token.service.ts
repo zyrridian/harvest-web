@@ -1,6 +1,6 @@
 import { SignJWT, jwtVerify } from "jose";
-import { TokenPayload } from "@/types/auth";
-import { AUTH } from "@/config/constants";
+import { TokenPayload } from "@/core/types/auth";
+import { AUTH } from "@/core/config/constants";
 
 /**
  * Get JWT secret from environment variables.
@@ -44,9 +44,7 @@ export async function signRefreshToken(
 /**
  * Verify a JWT token and return the payload, or null if invalid.
  */
-export async function verifyToken(
-  token: string,
-): Promise<TokenPayload | null> {
+export async function verifyToken(token: string): Promise<TokenPayload | null> {
   try {
     const { payload } = await jwtVerify(token, getSecret());
     return payload as TokenPayload;
@@ -67,9 +65,7 @@ export function getRefreshTokenExpiry(): Date {
 /**
  * Extract bearer token from Authorization header.
  */
-export function extractBearerToken(
-  authHeader: string | null,
-): string | null {
+export function extractBearerToken(authHeader: string | null): string | null {
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return null;
   }

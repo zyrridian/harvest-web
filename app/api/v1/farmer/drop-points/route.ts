@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { verifyToken, extractBearerToken } from "@/lib/auth";
+import prisma from "@/core/database/prisma";
+import { verifyToken, extractBearerToken } from "@/features/auth";
 
 /**
  * GET /api/v1/farmer/drop-points
@@ -9,15 +9,27 @@ import { verifyToken, extractBearerToken } from "@/lib/auth";
 export async function GET(request: NextRequest) {
   try {
     const token = extractBearerToken(request.headers.get("authorization"));
-    if (!token) return NextResponse.json({ status: "error", message: "Unauthorized" }, { status: 401 });
+    if (!token)
+      return NextResponse.json(
+        { status: "error", message: "Unauthorized" },
+        { status: 401 },
+      );
     const payload = await verifyToken(token);
     if (!payload || payload.user_type !== "PRODUCER") {
-      return NextResponse.json({ status: "error", message: "Forbidden" }, { status: 403 });
+      return NextResponse.json(
+        { status: "error", message: "Forbidden" },
+        { status: 403 },
+      );
     }
 
-    const farmer = await prisma.farmer.findUnique({ where: { userId: payload.userId } });
+    const farmer = await prisma.farmer.findUnique({
+      where: { userId: payload.userId },
+    });
     if (!farmer) {
-      return NextResponse.json({ status: "error", message: "Farmer profile not found" }, { status: 404 });
+      return NextResponse.json(
+        { status: "error", message: "Farmer profile not found" },
+        { status: 404 },
+      );
     }
 
     const dropPoints = await prisma.dropPoint.findMany({
@@ -42,7 +54,10 @@ export async function GET(request: NextRequest) {
       })),
     });
   } catch (error: any) {
-    return NextResponse.json({ status: "error", message: error.message }, { status: 500 });
+    return NextResponse.json(
+      { status: "error", message: error.message },
+      { status: 500 },
+    );
   }
 }
 
@@ -53,24 +68,44 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const token = extractBearerToken(request.headers.get("authorization"));
-    if (!token) return NextResponse.json({ status: "error", message: "Unauthorized" }, { status: 401 });
+    if (!token)
+      return NextResponse.json(
+        { status: "error", message: "Unauthorized" },
+        { status: 401 },
+      );
     const payload = await verifyToken(token);
     if (!payload || payload.user_type !== "PRODUCER") {
-      return NextResponse.json({ status: "error", message: "Forbidden" }, { status: 403 });
+      return NextResponse.json(
+        { status: "error", message: "Forbidden" },
+        { status: 403 },
+      );
     }
 
-    const farmer = await prisma.farmer.findUnique({ where: { userId: payload.userId } });
+    const farmer = await prisma.farmer.findUnique({
+      where: { userId: payload.userId },
+    });
     if (!farmer) {
-      return NextResponse.json({ status: "error", message: "Farmer profile not found" }, { status: 404 });
+      return NextResponse.json(
+        { status: "error", message: "Farmer profile not found" },
+        { status: 404 },
+      );
     }
 
     const body = await request.json();
-    const { name, description, what_we_sell, latitude, longitude, address, image_url } = body;
+    const {
+      name,
+      description,
+      what_we_sell,
+      latitude,
+      longitude,
+      address,
+      image_url,
+    } = body;
 
     if (!name || latitude === undefined || longitude === undefined) {
       return NextResponse.json(
         { status: "error", message: "name, latitude, longitude required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -99,9 +134,12 @@ export async function POST(request: NextRequest) {
           longitude: dropPoint.longitude,
         },
       },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (error: any) {
-    return NextResponse.json({ status: "error", message: error.message }, { status: 500 });
+    return NextResponse.json(
+      { status: "error", message: error.message },
+      { status: 500 },
+    );
   }
 }

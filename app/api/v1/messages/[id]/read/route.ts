@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAuth } from "@/lib/auth";
-import prisma from "@/lib/prisma";
+import { verifyAuth } from "@/features/auth";
+import prisma from "@/core/database/prisma";
 
 /**
  * @swagger
@@ -29,13 +29,13 @@ import prisma from "@/lib/prisma";
  */
 export async function PATCH(
   request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
-        // Await params in Next.js 15+
+    // Await params in Next.js 15+
     const { id } = await context.params;
 
-const payload = await verifyAuth(request);
+    const payload = await verifyAuth(request);
     const { id: messageId } = await context.params;
 
     // Find message
@@ -49,7 +49,7 @@ const payload = await verifyAuth(request);
     if (!message) {
       return NextResponse.json(
         { status: "error", message: "Message not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -63,7 +63,7 @@ const payload = await verifyAuth(request);
     if (!isRecipient) {
       return NextResponse.json(
         { status: "error", message: "Only recipient can mark message as read" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -89,7 +89,7 @@ const payload = await verifyAuth(request);
     console.error("Mark message as read error:", error);
     return NextResponse.json(
       { status: "error", message: "Failed to mark message as read" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

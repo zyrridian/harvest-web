@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
-import { verifyAuth } from "@/lib/auth";
-import { AppError, handleRouteError } from "@/lib/errors";
-import { successResponse } from "@/lib/helpers/response";
+import prisma from "@/core/database/prisma";
+import { verifyAuth } from "@/features/auth";
+import { AppError, handleRouteError } from "@/core/errors";
+import { successResponse } from "@/core/helpers/response";
 
 /**
  * @swagger
@@ -40,8 +40,17 @@ export async function GET(
     const post = await prisma.communityPost.findUnique({
       where: { id },
       include: {
-        user: { select: { id: true, name: true, avatarUrl: true, userType: true } },
-        farmer: { select: { id: true, name: true, profileImage: true, isVerified: true } },
+        user: {
+          select: { id: true, name: true, avatarUrl: true, userType: true },
+        },
+        farmer: {
+          select: {
+            id: true,
+            name: true,
+            profileImage: true,
+            isVerified: true,
+          },
+        },
         images: { orderBy: { displayOrder: "asc" } },
         tags: true,
         _count: { select: { likes: true, comments: true } },
@@ -86,7 +95,8 @@ export async function PUT(
 
     const post = await prisma.communityPost.findUnique({ where: { id } });
     if (!post) throw AppError.notFound("Post not found");
-    if (post.userId !== user.userId) throw AppError.forbidden("Not authorized to update this post");
+    if (post.userId !== user.userId)
+      throw AppError.forbidden("Not authorized to update this post");
 
     const updateData: Record<string, unknown> = {};
     if (body.title) updateData.title = body.title;
@@ -127,7 +137,8 @@ export async function DELETE(
 
     const post = await prisma.communityPost.findUnique({ where: { id } });
     if (!post) throw AppError.notFound("Post not found");
-    if (post.userId !== user.userId) throw AppError.forbidden("Not authorized to delete this post");
+    if (post.userId !== user.userId)
+      throw AppError.forbidden("Not authorized to delete this post");
 
     await prisma.communityPost.delete({ where: { id } });
 

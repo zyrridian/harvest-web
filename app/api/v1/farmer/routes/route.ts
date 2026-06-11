@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
-import { verifyAuth } from "@/lib/auth";
-import { AppError, handleRouteError } from "@/lib/errors";
-import { successResponse } from "@/lib/helpers/response";
+import prisma from "@/core/database/prisma";
+import { verifyAuth } from "@/features/auth";
+import { AppError, handleRouteError } from "@/core/errors";
+import { successResponse } from "@/core/helpers/response";
 
 // ============================================================
 // OpenRouteService route optimization (free, no billing risk)
@@ -30,7 +30,10 @@ function haversineKm(a: Coord, b: Coord): number {
 }
 
 // Nearest-neighbor TSP fallback (good enough for <20 stops)
-function nearestNeighborOrder(start: Coord, stops: { id: string; coord: Coord }[]): string[] {
+function nearestNeighborOrder(
+  start: Coord,
+  stops: { id: string; coord: Coord }[],
+): string[] {
   const remaining = [...stops];
   const result: string[] = [];
   let current = start;
@@ -39,7 +42,10 @@ function nearestNeighborOrder(start: Coord, stops: { id: string; coord: Coord }[
     let minDist = Infinity;
     for (let i = 0; i < remaining.length; i++) {
       const d = haversineKm(current, remaining[i].coord);
-      if (d < minDist) { minDist = d; nearest = i; }
+      if (d < minDist) {
+        minDist = d;
+        nearest = i;
+      }
     }
     result.push(remaining[nearest].id);
     current = remaining[nearest].coord;
@@ -50,18 +56,24 @@ function nearestNeighborOrder(start: Coord, stops: { id: string; coord: Coord }[
 
 async function optimizeWithORS(
   start: Coord,
-  stops: { id: string; coord: Coord }[]
-): Promise<{ orderedIds: string[]; totalKm: number; totalMinutes: number } | null> {
+  stops: { id: string; coord: Coord }[],
+): Promise<{
+  orderedIds: string[];
+  totalKm: number;
+  totalMinutes: number;
+} | null> {
   if (!ORS_KEY || stops.length === 0) return null;
 
   try {
     // ORS Optimization API (Traveling Salesman)
-    const vehicles = [{
-      id: 1,
-      profile: "driving-car",
-      start: [start.lng, start.lat],
-      end: [start.lng, start.lat],
-    }];
+    const vehicles = [
+      {
+        id: 1,
+        profile: "driving-car",
+        start: [start.lng, start.lat],
+        end: [start.lng, start.lat],
+      },
+    ];
     const jobs = stops.map((s, i) => ({
       id: i + 1,
       location: [s.coord.lng, s.coord.lat],
@@ -101,7 +113,9 @@ async function optimizeWithORS(
 export async function GET(request: NextRequest) {
   try {
     const payload = await verifyAuth(request);
-    const farmer = await prisma.farmer.findUnique({ where: { userId: payload.userId } });
+    const farmer = await prisma.farmer.findUnique({
+      where: { userId: payload.userId },
+    });
     if (!farmer) throw AppError.notFound("Farmer profile not found");
 
     const { searchParams } = new URL(request.url);
@@ -167,7 +181,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const payload = await verifyAuth(request);
-    const farmer = await prisma.farmer.findUnique({ where: { userId: payload.userId } });
+    const farmer = await prisma.farmer.findUnique({
+      where: { userId: payload.userId },
+    });
     if (!farmer) throw AppError.notFound("Farmer profile not found");
 
     const body = await request.json();
@@ -186,19 +202,31 @@ export async function POST(request: NextRequest) {
       },
       include: {
         deliveryAddress: {
-          select: { latitude: true, longitude: true, fullAddress: true, recipientName: true, label: true },
+          select: {
+            latitude: true,
+            longitude: true,
+            fullAddress: true,
+            recipientName: true,
+            label: true,
+          },
         },
       },
     });
 
-    if (orders.length === 0) throw AppError.notFound("No valid farmer_delivery orders found");
+    if (orders.length === 0)
+      throw AppError.notFound("No valid farmer_delivery orders found");
 
     // Build stop data (skip orders without coordinates — they get manual handling)
     const stopsWithCoords = orders
-      .filter((o) => o.deliveryAddress?.latitude && o.deliveryAddress?.longitude)
+      .filter(
+        (o) => o.deliveryAddress?.latitude && o.deliveryAddress?.longitude,
+      )
       .map((o) => ({
         id: o.id,
-        coord: { lat: o.deliveryAddress!.latitude!, lng: o.deliveryAddress!.longitude! },
+        coord: {
+          lat: o.deliveryAddress!.latitude!,
+          lng: o.deliveryAddress!.longitude!,
+        },
         address: o.deliveryAddress,
       }));
 
@@ -233,7 +261,9 @@ export async function POST(request: NextRequest) {
 
     // Also append orders without coords at the end (manual)
     const noCoordIds = orders
-      .filter((o) => !o.deliveryAddress?.latitude || !o.deliveryAddress?.longitude)
+      .filter(
+        (o) => !o.deliveryAddress?.latitude || !o.deliveryAddress?.longitude,
+      )
       .map((o) => o.id);
     orderedIds = [...orderedIds, ...noCoordIds];
 
@@ -255,7 +285,10 @@ export async function POST(request: NextRequest) {
               stopOrder: idx + 1,
               addressLat: order.deliveryAddress?.latitude ?? null,
               addressLng: order.deliveryAddress?.longitude ?? null,
-              addressLabel: order.deliveryAddress?.label ?? order.deliveryAddress?.fullAddress ?? null,
+              addressLabel:
+                order.deliveryAddress?.label ??
+                order.deliveryAddress?.fullAddress ??
+                null,
               recipientName: order.deliveryAddress?.recipientName ?? null,
             };
           }),
@@ -283,7 +316,7 @@ export async function POST(request: NextRequest) {
           status: s.status,
         })),
       },
-      { message: "Route created and optimized", status: 201 }
+      { message: "Route created and optimized", status: 201 },
     );
   } catch (error) {
     return handleRouteError(error, "Create route");

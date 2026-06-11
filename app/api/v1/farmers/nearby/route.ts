@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import prisma from "@/core/database/prisma";
 
 /**
  * Calculate distance between two coordinates using Haversine formula
@@ -8,7 +8,7 @@ function calculateDistance(
   lat1: number,
   lon1: number,
   lat2: number,
-  lon2: number
+  lon2: number,
 ): number {
   const R = 6371; // Radius of Earth in kilometers
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
           status: "error",
           message: "Latitude and longitude are required",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
           userLat,
           userLon,
           farmer.latitude,
-          farmer.longitude
+          farmer.longitude,
         );
 
         return {
@@ -114,7 +114,7 @@ export async function GET(request: NextRequest) {
       })
       .filter(
         (farmer): farmer is NonNullable<typeof farmer> =>
-          farmer !== null && farmer.distance <= radius
+          farmer !== null && farmer.distance <= radius,
       )
       .sort((a, b) => a.distance - b.distance)
       .slice(0, limit);
@@ -144,7 +144,7 @@ export async function GET(request: NextRequest) {
         message: "Failed to fetch nearby farmers",
         error: error.message,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
-import { verifyAuth } from "@/lib/auth";
-import { AppError, handleRouteError } from "@/lib/errors";
-import { successResponse } from "@/lib/helpers/response";
+import prisma from "@/core/database/prisma";
+import { verifyAuth } from "@/features/auth";
+import { AppError, handleRouteError } from "@/core/errors";
+import { successResponse } from "@/core/helpers/response";
 
 /**
  * @swagger
@@ -23,7 +23,8 @@ export async function DELETE(
 
     const comment = await prisma.postComment.findUnique({ where: { id } });
     if (!comment) throw AppError.notFound("Comment not found");
-    if (comment.userId !== user.userId) throw AppError.forbidden("Not authorized to delete this comment");
+    if (comment.userId !== user.userId)
+      throw AppError.forbidden("Not authorized to delete this comment");
 
     await prisma.$transaction([
       prisma.postComment.delete({ where: { id } }),
@@ -33,7 +34,9 @@ export async function DELETE(
       }),
     ]);
 
-    return successResponse(undefined, { message: "Comment deleted successfully" });
+    return successResponse(undefined, {
+      message: "Comment deleted successfully",
+    });
   } catch (error) {
     return handleRouteError(error, "Delete comment");
   }

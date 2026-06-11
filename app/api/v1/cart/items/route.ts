@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
-import { verifyAuth } from "@/lib/auth";
-import { AppError, handleRouteError } from "@/lib/errors";
-import { successResponse } from "@/lib/helpers/response";
+import prisma from "@/core/database/prisma";
+import { verifyAuth } from "@/features/auth";
+import { AppError, handleRouteError } from "@/core/errors";
+import { successResponse } from "@/core/helpers/response";
 
 /**
  * @swagger
@@ -43,7 +43,12 @@ export async function POST(request: NextRequest) {
       throw AppError.badRequest("Product ID is required");
     }
 
-    if (quantity !== undefined && (typeof quantity !== "number" || !Number.isInteger(quantity) || quantity < 1)) {
+    if (
+      quantity !== undefined &&
+      (typeof quantity !== "number" ||
+        !Number.isInteger(quantity) ||
+        quantity < 1)
+    ) {
       throw AppError.badRequest("Quantity must be a positive integer");
     }
 
@@ -89,17 +94,34 @@ export async function POST(request: NextRequest) {
       const newSubtotal = (discountPrice || product.price) * newQuantity;
       cartItem = await prisma.cartItem.update({
         where: { id: existingItem.id },
-        data: { quantity: newQuantity, subtotal: newSubtotal, notes: notes || existingItem.notes },
+        data: {
+          quantity: newQuantity,
+          subtotal: newSubtotal,
+          notes: notes || existingItem.notes,
+        },
       });
     } else {
       cartItem = await prisma.cartItem.create({
-        data: { cartId: cart.id, productId: product_id, quantity, unitPrice: product.price, discountPrice, subtotal, notes },
+        data: {
+          cartId: cart.id,
+          productId: product_id,
+          quantity,
+          unitPrice: product.price,
+          discountPrice,
+          subtotal,
+          notes,
+        },
       });
     }
 
-    const allItems = await prisma.cartItem.findMany({ where: { cartId: cart.id } });
+    const allItems = await prisma.cartItem.findMany({
+      where: { cartId: cart.id },
+    });
     const cartTotalItems = allItems.length;
-    const cartGrandTotal = allItems.reduce((sum, item) => sum + item.subtotal, 0);
+    const cartGrandTotal = allItems.reduce(
+      (sum, item) => sum + item.subtotal,
+      0,
+    );
 
     return successResponse(
       {

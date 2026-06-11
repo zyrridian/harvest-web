@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
-import { verifyAuth } from "@/lib/auth";
-import { AppError, handleRouteError } from "@/lib/errors";
-import { successResponse } from "@/lib/helpers/response";
+import prisma from "@/core/database/prisma";
+import { verifyAuth } from "@/features/auth";
+import { AppError, handleRouteError } from "@/core/errors";
+import { successResponse } from "@/core/helpers/response";
 
 /**
  * GET /api/v1/farmer/delivery-settings
@@ -22,12 +22,14 @@ export async function GET(request: NextRequest) {
     return successResponse({
       delivery_settings: farmer.deliverySettings
         ? {
-            farmer_delivery_enabled: farmer.deliverySettings.farmerDeliveryEnabled,
+            farmer_delivery_enabled:
+              farmer.deliverySettings.farmerDeliveryEnabled,
             base_fee: farmer.deliverySettings.baseFee,
             per_km_rate: farmer.deliverySettings.perKmRate,
             max_radius_km: farmer.deliverySettings.maxRadiusKm,
             min_order_for_free: farmer.deliverySettings.minOrderForFree,
-            cash_on_delivery_enabled: farmer.deliverySettings.cashOnDeliveryEnabled,
+            cash_on_delivery_enabled:
+              farmer.deliverySettings.cashOnDeliveryEnabled,
             notes: farmer.deliverySettings.notes,
           }
         : null,
@@ -73,12 +75,18 @@ export async function PUT(request: NextRequest) {
         notes: notes ?? null,
       },
       update: {
-        ...(farmer_delivery_enabled !== undefined && { farmerDeliveryEnabled: farmer_delivery_enabled }),
+        ...(farmer_delivery_enabled !== undefined && {
+          farmerDeliveryEnabled: farmer_delivery_enabled,
+        }),
         ...(base_fee !== undefined && { baseFee: base_fee }),
         ...(per_km_rate !== undefined && { perKmRate: per_km_rate }),
         ...(max_radius_km !== undefined && { maxRadiusKm: max_radius_km }),
-        ...(min_order_for_free !== undefined && { minOrderForFree: min_order_for_free }),
-        ...(cash_on_delivery_enabled !== undefined && { cashOnDeliveryEnabled: cash_on_delivery_enabled }),
+        ...(min_order_for_free !== undefined && {
+          minOrderForFree: min_order_for_free,
+        }),
+        ...(cash_on_delivery_enabled !== undefined && {
+          cashOnDeliveryEnabled: cash_on_delivery_enabled,
+        }),
         ...(notes !== undefined && { notes }),
       },
     });
@@ -93,7 +101,7 @@ export async function PUT(request: NextRequest) {
         cash_on_delivery_enabled: settings.cashOnDeliveryEnabled,
         notes: settings.notes,
       },
-      { message: "Delivery settings updated" }
+      { message: "Delivery settings updated" },
     );
   } catch (error) {
     return handleRouteError(error, "Update delivery settings");

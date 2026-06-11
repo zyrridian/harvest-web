@@ -1,8 +1,11 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
-import { AppError, handleRouteError } from "@/lib/errors";
-import { successResponse } from "@/lib/helpers/response";
-import { parsePagination, buildPaginationMeta } from "@/lib/helpers/pagination";
+import prisma from "@/core/database/prisma";
+import { AppError, handleRouteError } from "@/core/errors";
+import { successResponse } from "@/core/helpers/response";
+import {
+  parsePagination,
+  buildPaginationMeta,
+} from "@/core/helpers/pagination";
 
 /**
  * @swagger
@@ -56,9 +59,11 @@ export async function GET(
     }
 
     const orderBy: Record<string, string> =
-      sortBy === "price" ? { price: "asc" } :
-      sortBy === "rating" ? { rating: "desc" } :
-      { createdAt: "desc" };
+      sortBy === "price"
+        ? { price: "asc" }
+        : sortBy === "rating"
+          ? { rating: "desc" }
+          : { createdAt: "desc" };
 
     const [products, totalItems] = await Promise.all([
       prisma.product.findMany({
@@ -68,15 +73,25 @@ export async function GET(
         orderBy,
         include: {
           seller: { select: { id: true, name: true } },
-          images: { where: { isPrimary: true }, take: 1, select: { url: true } },
+          images: {
+            where: { isPrimary: true },
+            take: 1,
+            select: { url: true },
+          },
           discounts: {
-            where: { isActive: true, validFrom: { lte: new Date() }, validUntil: { gte: new Date() } },
+            where: {
+              isActive: true,
+              validFrom: { lte: new Date() },
+              validUntil: { gte: new Date() },
+            },
             take: 1,
             orderBy: { value: "desc" },
           },
         },
       }),
-      prisma.product.count({ where: { categoryId: category.id, isAvailable: true } }),
+      prisma.product.count({
+        where: { categoryId: category.id, isAvailable: true },
+      }),
     ]);
 
     const formattedProducts = products.map((product) => {

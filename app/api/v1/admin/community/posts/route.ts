@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { verifyAdmin } from "@/lib/auth";
+import prisma from "@/core/database/prisma";
+import { verifyAdmin } from "@/features/auth";
 
 /**
  * @swagger
@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
         status: "error",
         message: error.message || "Failed to get posts",
       },
-      { status: error.status || 500 }
+      { status: error.status || 500 },
     );
   }
 }

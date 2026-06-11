@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAuth } from "@/lib/auth";
-import prisma from "@/lib/prisma";
+import { verifyAuth } from "@/features/auth";
+import prisma from "@/core/database/prisma";
 
 /**
  * @swagger
@@ -203,13 +203,13 @@ export async function GET(request: NextRequest) {
           created_at: conv.createdAt.toISOString(),
           updated_at: conv.updatedAt.toISOString(),
         };
-      })
+      }),
     );
 
     // Apply search filter if provided
     const filteredConversations = search
       ? formattedConversations.filter((conv) =>
-          conv.participant.name.toLowerCase().includes(search.toLowerCase())
+          conv.participant.name.toLowerCase().includes(search.toLowerCase()),
         )
       : formattedConversations;
 
@@ -234,7 +234,7 @@ export async function GET(request: NextRequest) {
     console.error("Get conversations error:", error);
     return NextResponse.json(
       { status: "error", message: "Failed to fetch conversations" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -294,7 +294,7 @@ export async function POST(request: NextRequest) {
     if (!recipient_id) {
       return NextResponse.json(
         { status: "error", message: "Recipient ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -306,7 +306,7 @@ export async function POST(request: NextRequest) {
     if (!recipient) {
       return NextResponse.json(
         { status: "error", message: "Recipient not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -369,13 +369,13 @@ export async function POST(request: NextRequest) {
           message_id: message?.id || null,
         },
       },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (error) {
     console.error("Start conversation error:", error);
     return NextResponse.json(
       { status: "error", message: "Failed to start conversation" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

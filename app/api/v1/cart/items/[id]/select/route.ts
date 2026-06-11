@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
-import { verifyAuth } from "@/lib/auth";
-import { AppError, handleRouteError } from "@/lib/errors";
-import { successResponse } from "@/lib/helpers/response";
+import prisma from "@/core/database/prisma";
+import { verifyAuth } from "@/features/auth";
+import { AppError, handleRouteError } from "@/core/errors";
+import { successResponse } from "@/core/helpers/response";
 
 /**
  * @swagger
@@ -71,10 +71,17 @@ export async function PATCH(
       where: { cartId: cartItem.cartId, isSelected: true },
     });
 
-    const selectedItemsTotal = selectedItems.reduce((sum, item) => sum + item.subtotal, 0);
+    const selectedItemsTotal = selectedItems.reduce(
+      (sum, item) => sum + item.subtotal,
+      0,
+    );
 
     return successResponse(
-      { cart_item_id: updated.id, is_selected: updated.isSelected, selected_items_total: selectedItemsTotal },
+      {
+        cart_item_id: updated.id,
+        is_selected: updated.isSelected,
+        selected_items_total: selectedItemsTotal,
+      },
       { message: "Item selection updated" },
     );
   } catch (error) {

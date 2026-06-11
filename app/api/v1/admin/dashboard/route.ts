@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { verifyAdmin } from "@/lib/auth";
+import prisma from "@/core/database/prisma";
+import { verifyAdmin } from "@/features/auth";
 
 /**
  * @swagger
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     const startOfToday = new Date(
       now.getFullYear(),
       now.getMonth(),
-      now.getDate()
+      now.getDate(),
     );
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
       0,
       23,
       59,
-      59
+      59,
     );
 
     // Parallel queries for better performance
@@ -235,10 +235,13 @@ export async function GET(request: NextRequest) {
         },
         recent_orders: recentOrders,
         top_products: topProducts,
-        orders_by_status: ordersByStatus.reduce((acc, item) => {
-          acc[item.status] = item._count;
-          return acc;
-        }, {} as Record<string, number>),
+        orders_by_status: ordersByStatus.reduce(
+          (acc, item) => {
+            acc[item.status] = item._count;
+            return acc;
+          },
+          {} as Record<string, number>,
+        ),
       },
     });
   } catch (error: any) {
@@ -248,7 +251,7 @@ export async function GET(request: NextRequest) {
         status: "error",
         message: error.message || "Failed to get dashboard data",
       },
-      { status: error.status || 500 }
+      { status: error.status || 500 },
     );
   }
 }

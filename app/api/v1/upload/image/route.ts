@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { verifyAuth } from "@/lib/auth";
+import prisma from "@/core/database/prisma";
+import { verifyAuth } from "@/features/auth";
 import { nanoid } from "nanoid";
 
 /**
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
           message:
             "Missing required fields: url, file_name, file_size, mime_type",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
         message: "Image uploaded successfully",
         data: image,
       },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (error: any) {
     console.error("Upload image error:", error);
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
         status: "error",
         message: error.message || "Failed to upload image",
       },
-      { status: error.status || 500 }
+      { status: error.status || 500 },
     );
   }
 }

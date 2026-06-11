@@ -1,9 +1,12 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
-import { verifyAuth } from "@/lib/auth";
-import { AppError, handleRouteError } from "@/lib/errors";
-import { successResponse } from "@/lib/helpers/response";
-import { parsePagination, buildPaginationMeta } from "@/lib/helpers/pagination";
+import prisma from "@/core/database/prisma";
+import { verifyAuth } from "@/features/auth";
+import { AppError, handleRouteError } from "@/core/errors";
+import { successResponse } from "@/core/helpers/response";
+import {
+  parsePagination,
+  buildPaginationMeta,
+} from "@/core/helpers/pagination";
 
 /**
  * @swagger
@@ -64,8 +67,17 @@ export async function GET(request: NextRequest) {
         skip,
         take: limit,
         include: {
-          user: { select: { id: true, name: true, avatarUrl: true, userType: true } },
-          farmer: { select: { id: true, name: true, profileImage: true, isVerified: true } },
+          user: {
+            select: { id: true, name: true, avatarUrl: true, userType: true },
+          },
+          farmer: {
+            select: {
+              id: true,
+              name: true,
+              profileImage: true,
+              isVerified: true,
+            },
+          },
           images: { orderBy: { displayOrder: "asc" } },
           tags: true,
           _count: { select: { likes: true, comments: true } },
@@ -74,7 +86,10 @@ export async function GET(request: NextRequest) {
       prisma.communityPost.count({ where }),
     ]);
 
-    let postsWithLikeStatus = posts.map((p) => ({ ...p, is_liked_by_user: false }));
+    let postsWithLikeStatus = posts.map((p) => ({
+      ...p,
+      is_liked_by_user: false,
+    }));
     if (userId) {
       const userLikes = await prisma.postLike.findMany({
         where: { userId, postId: { in: posts.map((p) => p.id) } },
@@ -158,21 +173,38 @@ export async function POST(request: NextRequest) {
         title,
         content,
         images: images?.length
-          ? { create: images.map((url: string, index: number) => ({ url, displayOrder: index })) }
+          ? {
+              create: images.map((url: string, index: number) => ({
+                url,
+                displayOrder: index,
+              })),
+            }
           : undefined,
         tags: tags?.length
           ? { create: tags.map((tag: string) => ({ tag: tag.toLowerCase() })) }
           : undefined,
       },
       include: {
-        user: { select: { id: true, name: true, avatarUrl: true, userType: true } },
-        farmer: { select: { id: true, name: true, profileImage: true, isVerified: true } },
+        user: {
+          select: { id: true, name: true, avatarUrl: true, userType: true },
+        },
+        farmer: {
+          select: {
+            id: true,
+            name: true,
+            profileImage: true,
+            isVerified: true,
+          },
+        },
         images: true,
         tags: true,
       },
     });
 
-    return successResponse(post, { message: "Post created successfully", status: 201 });
+    return successResponse(post, {
+      message: "Post created successfully",
+      status: 201,
+    });
   } catch (error) {
     return handleRouteError(error, "Create community post");
   }

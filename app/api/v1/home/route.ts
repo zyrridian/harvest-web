@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import prisma from "@/core/database/prisma";
 
 /**
  * @swagger
@@ -175,6 +175,7 @@ export async function GET(request: NextRequest) {
       radius_km: number;
       farmers: Array<{
         id: string;
+        user_id: string;
         name: string;
         profile_image: string | null;
         latitude: number | null;
@@ -208,6 +209,7 @@ export async function GET(request: NextRequest) {
         },
         select: {
           id: true,
+          userId: true,
           name: true,
           profileImage: true,
           latitude: true,
@@ -246,6 +248,7 @@ export async function GET(request: NextRequest) {
         radius_km: radius,
         farmers: nearbyFarmers.map((f) => ({
           id: f.id,
+          user_id: f.userId,
           name: f.name,
           profile_image: f.profileImage,
           latitude: f.latitude,

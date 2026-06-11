@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { verifyToken, extractBearerToken } from "@/lib/auth";
+import prisma from "@/core/database/prisma";
+import { verifyToken, extractBearerToken } from "@/features/auth";
 
 /**
  * @swagger
@@ -20,13 +20,13 @@ import { verifyToken, extractBearerToken } from "@/lib/auth";
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-        // Await params in Next.js 15+
+    // Await params in Next.js 15+
     const { id } = await params;
 
-// Get user ID if authenticated (optional)
+    // Get user ID if authenticated (optional)
     let userId: string | null = null;
     const authHeader = request.headers.get("authorization");
     const token = extractBearerToken(authHeader);
@@ -49,7 +49,7 @@ export async function POST(
     if (!product) {
       return NextResponse.json(
         { status: "error", message: "Product not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -83,7 +83,7 @@ export async function POST(
         message: "Failed to track view",
         error: error.message,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

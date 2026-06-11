@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import prisma from "@/core/database/prisma";
 
 /**
  * @swagger
@@ -147,7 +147,7 @@ export async function GET(request: NextRequest) {
         message: "Failed to fetch farmers",
         error: error.message,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

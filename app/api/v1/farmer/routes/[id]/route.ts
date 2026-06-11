@@ -1,18 +1,20 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
-import { verifyAuth } from "@/lib/auth";
-import { AppError, handleRouteError } from "@/lib/errors";
-import { successResponse } from "@/lib/helpers/response";
+import prisma from "@/core/database/prisma";
+import { verifyAuth } from "@/features/auth";
+import { AppError, handleRouteError } from "@/core/errors";
+import { successResponse } from "@/core/helpers/response";
 
 // GET /api/v1/farmer/routes/[id]
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
     const payload = await verifyAuth(request);
-    const farmer = await prisma.farmer.findUnique({ where: { userId: payload.userId } });
+    const farmer = await prisma.farmer.findUnique({
+      where: { userId: payload.userId },
+    });
     if (!farmer) throw AppError.notFound("Farmer profile not found");
 
     const route = await prisma.deliveryRoute.findFirst({
@@ -45,7 +47,11 @@ export async function GET(
       status: route.status,
       tracking_enabled: route.trackingEnabled,
       current_location: route.currentLat
-        ? { lat: route.currentLat, lng: route.currentLng, updated_at: route.locationUpdatedAt }
+        ? {
+            lat: route.currentLat,
+            lng: route.currentLng,
+            updated_at: route.locationUpdatedAt,
+          }
         : null,
       total_distance_km: route.totalDistanceKm,
       estimated_minutes: route.estimatedMinutes,
@@ -78,12 +84,14 @@ export async function GET(
 // PATCH /api/v1/farmer/routes/[id] — update status, toggle tracking, update stop status
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
     const payload = await verifyAuth(request);
-    const farmer = await prisma.farmer.findUnique({ where: { userId: payload.userId } });
+    const farmer = await prisma.farmer.findUnique({
+      where: { userId: payload.userId },
+    });
     if (!farmer) throw AppError.notFound("Farmer profile not found");
 
     const route = await prisma.deliveryRoute.findFirst({
@@ -124,9 +132,15 @@ export async function PATCH(
       where: { id },
       data: {
         ...(status && { status }),
-        ...(tracking_enabled !== undefined && { trackingEnabled: tracking_enabled }),
-        ...(status === "active" && !route.startedAt && { startedAt: new Date() }),
-        ...(status === "completed" && { completedAt: new Date(), trackingEnabled: false }),
+        ...(tracking_enabled !== undefined && {
+          trackingEnabled: tracking_enabled,
+        }),
+        ...(status === "active" &&
+          !route.startedAt && { startedAt: new Date() }),
+        ...(status === "completed" && {
+          completedAt: new Date(),
+          trackingEnabled: false,
+        }),
       },
     });
 

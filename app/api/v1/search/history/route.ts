@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAuth } from "@/lib/auth";
-import prisma from "@/lib/prisma";
+import { verifyAuth } from "@/features/auth";
+import prisma from "@/core/database/prisma";
 
 /**
  * @swagger
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
     console.error("Get search history error:", error);
     return NextResponse.json(
       { status: "error", message: "Failed to fetch search history" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -92,7 +92,7 @@ export async function DELETE(request: NextRequest) {
     console.error("Clear search history error:", error);
     return NextResponse.json(
       { status: "error", message: "Failed to clear search history" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
-import { verifyAuth } from "@/lib/auth";
-import { AppError, handleRouteError } from "@/lib/errors";
-import { successResponse } from "@/lib/helpers/response";
+import prisma from "@/core/database/prisma";
+import { verifyAuth } from "@/features/auth";
+import { AppError, handleRouteError } from "@/core/errors";
+import { successResponse } from "@/core/helpers/response";
 
 /**
  * @swagger
@@ -47,7 +47,12 @@ async function handleUpdate(
     const body = await request.json();
     const { quantity, notes } = body;
 
-    if (quantity !== undefined && (typeof quantity !== "number" || !Number.isInteger(quantity) || quantity < 1)) {
+    if (
+      quantity !== undefined &&
+      (typeof quantity !== "number" ||
+        !Number.isInteger(quantity) ||
+        quantity < 1)
+    ) {
       throw AppError.badRequest("Quantity must be a positive integer");
     }
 
@@ -87,13 +92,19 @@ async function handleUpdate(
     if (quantity !== undefined) {
       // Validate against product constraints
       if (quantity < cartItem.product.minimumOrder) {
-        throw AppError.badRequest(`Minimum order for this product is ${cartItem.product.minimumOrder}`);
+        throw AppError.badRequest(
+          `Minimum order for this product is ${cartItem.product.minimumOrder}`,
+        );
       }
       if (quantity > cartItem.product.maximumOrder) {
-        throw AppError.badRequest(`Maximum order for this product is ${cartItem.product.maximumOrder}`);
+        throw AppError.badRequest(
+          `Maximum order for this product is ${cartItem.product.maximumOrder}`,
+        );
       }
       if (quantity > cartItem.product.stockQuantity) {
-        throw AppError.badRequest(`Only ${cartItem.product.stockQuantity} items left in stock`);
+        throw AppError.badRequest(
+          `Only ${cartItem.product.stockQuantity} items left in stock`,
+        );
       }
     }
 
@@ -122,17 +133,22 @@ async function handleUpdate(
       data: { updatedAt: new Date() },
     });
 
-    const allItems = await prisma.cartItem.findMany({ where: { cartId: cartItem.cartId } });
+    const allItems = await prisma.cartItem.findMany({
+      where: { cartId: cartItem.cartId },
+    });
     const cartTotalItems = allItems.length;
-    const cartGrandTotal = allItems.reduce((sum, item) => sum + item.subtotal, 0);
+    const cartGrandTotal = allItems.reduce(
+      (sum, item) => sum + item.subtotal,
+      0,
+    );
 
     return successResponse(
-      { 
-        cart_item_id: updated.id, 
-        quantity: updated.quantity, 
-        subtotal: updated.subtotal, 
+      {
+        cart_item_id: updated.id,
+        quantity: updated.quantity,
+        subtotal: updated.subtotal,
         cart_total_items: cartTotalItems,
-        cart_grand_total: cartGrandTotal 
+        cart_grand_total: cartGrandTotal,
       },
       { message: "Cart item updated" },
     );
@@ -141,11 +157,17 @@ async function handleUpdate(
   }
 }
 
-export async function PUT(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+export async function PUT(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> },
+) {
   return handleUpdate(request, context);
 }
 
-export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+export async function PATCH(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> },
+) {
   return handleUpdate(request, context);
 }
 
@@ -193,9 +215,14 @@ export async function DELETE(
 
     await prisma.cartItem.delete({ where: { id } });
 
-    const remainingItems = await prisma.cartItem.findMany({ where: { cartId: cartItem.cartId } });
+    const remainingItems = await prisma.cartItem.findMany({
+      where: { cartId: cartItem.cartId },
+    });
     const cartTotalItems = remainingItems.length;
-    const cartGrandTotal = remainingItems.reduce((sum, item) => sum + item.subtotal, 0);
+    const cartGrandTotal = remainingItems.reduce(
+      (sum, item) => sum + item.subtotal,
+      0,
+    );
 
     return successResponse(
       { cart_total_items: cartTotalItems, cart_grand_total: cartGrandTotal },

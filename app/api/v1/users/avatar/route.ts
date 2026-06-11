@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { verifyToken, extractBearerToken } from "@/lib/auth";
+import prisma from "@/core/database/prisma";
+import { verifyToken, extractBearerToken } from "@/features/auth";
 
 /**
  * @swagger
@@ -66,7 +66,7 @@ export async function PUT(request: NextRequest) {
     if (!token) {
       return NextResponse.json(
         { status: "error", message: "No token provided" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -76,7 +76,7 @@ export async function PUT(request: NextRequest) {
     if (!payload || payload.type !== "access") {
       return NextResponse.json(
         { status: "error", message: "Invalid token" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -87,7 +87,7 @@ export async function PUT(request: NextRequest) {
     if (!avatar) {
       return NextResponse.json(
         { status: "error", message: "No avatar file provided" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -99,7 +99,7 @@ export async function PUT(request: NextRequest) {
           status: "error",
           message: "Invalid file type. Only JPEG, PNG, and WebP are allowed",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -108,7 +108,7 @@ export async function PUT(request: NextRequest) {
     if (avatar.size > maxSize) {
       return NextResponse.json(
         { status: "error", message: "File size exceeds 5MB limit" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -142,7 +142,7 @@ export async function PUT(request: NextRequest) {
     console.error("Update avatar error:", error);
     return NextResponse.json(
       { status: "error", message: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

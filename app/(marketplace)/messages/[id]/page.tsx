@@ -16,7 +16,7 @@ import {
   Clock,
   ShoppingBag,
 } from "lucide-react";
-import { getSocket } from "@/lib/socket";
+import { getSocket } from "@/core/services/socket";
 
 // Design System Colors
 const colors = {
@@ -79,7 +79,9 @@ function ChatContent() {
   const router = useRouter();
   const conversationId = params.id as string;
 
-  const [conversation, setConversation] = useState<ConversationData | null>(null);
+  const [conversation, setConversation] = useState<ConversationData | null>(
+    null,
+  );
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -88,7 +90,9 @@ function ChatContent() {
   const [showMenu, setShowMenu] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isTyping, setIsTyping] = useState(false); // other user typing
-  const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(
+    null,
+  );
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -185,14 +189,20 @@ function ChatContent() {
     // Typing indicators
     socket.on("typing:start", (data: any) => {
       console.log("[Socket] typing:start", data);
-      if (data.conversation_id === conversationId && data.user_id !== currentUserId) {
+      if (
+        data.conversation_id === conversationId &&
+        data.user_id !== currentUserId
+      ) {
         setIsTyping(true);
       }
     });
 
     socket.on("typing:stop", (data: any) => {
       console.log("[Socket] typing:stop", data);
-      if (data.conversation_id === conversationId && data.user_id !== currentUserId) {
+      if (
+        data.conversation_id === conversationId &&
+        data.user_id !== currentUserId
+      ) {
         setIsTyping(false);
       }
     });
@@ -201,7 +211,9 @@ function ChatContent() {
     socket.on("user:online", (data: any) => {
       if (data.userId === conversation?.participant.user_id) {
         setConversation((prev) =>
-          prev ? { ...prev, participant: { ...prev.participant, is_online: true } } : prev,
+          prev
+            ? { ...prev, participant: { ...prev.participant, is_online: true } }
+            : prev,
         );
       }
     });
@@ -211,13 +223,13 @@ function ChatContent() {
         setConversation((prev) =>
           prev
             ? {
-              ...prev,
-              participant: {
-                ...prev.participant,
-                is_online: false,
-                last_seen: data.last_seen,
-              },
-            }
+                ...prev,
+                participant: {
+                  ...prev.participant,
+                  is_online: false,
+                  last_seen: data.last_seen,
+                },
+              }
             : prev,
         );
       }
@@ -285,10 +297,14 @@ function ChatContent() {
 
     // Typing indicator
     if (socketRef.current && isConnected) {
-      socketRef.current.emit("typing:start", { conversation_id: conversationId });
+      socketRef.current.emit("typing:start", {
+        conversation_id: conversationId,
+      });
       if (typingTimeout) clearTimeout(typingTimeout);
       const t = setTimeout(() => {
-        socketRef.current?.emit("typing:stop", { conversation_id: conversationId });
+        socketRef.current?.emit("typing:stop", {
+          conversation_id: conversationId,
+        });
       }, 2000);
       setTypingTimeout(t);
     }
@@ -355,7 +371,9 @@ function ChatContent() {
             ),
           );
         } else {
-          setMessages((prev) => prev.filter((msg) => msg.message_id !== tempId));
+          setMessages((prev) =>
+            prev.filter((msg) => msg.message_id !== tempId),
+          );
           setNewMessage(messageContent);
         }
       } catch (error) {
@@ -382,12 +400,18 @@ function ChatContent() {
     yesterday.setDate(yesterday.getDate() - 1);
     if (date.toDateString() === today.toDateString()) return "Today";
     if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
-    return date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+    return date.toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+    });
   };
 
   const getLastSeenText = (lastSeen: string | null) => {
     if (!lastSeen) return "Offline";
-    const diffMins = Math.floor((Date.now() - new Date(lastSeen).getTime()) / 60000);
+    const diffMins = Math.floor(
+      (Date.now() - new Date(lastSeen).getTime()) / 60000,
+    );
     if (diffMins < 1) return "Just now";
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`;
@@ -407,17 +431,33 @@ function ChatContent() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: colors.background }}>
-        <Loader2 size={32} className="animate-spin" style={{ color: colors.accent }} />
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ backgroundColor: colors.background }}
+      >
+        <Loader2
+          size={32}
+          className="animate-spin"
+          style={{ color: colors.accent }}
+        />
       </div>
     );
   }
 
   if (!conversation) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center" style={{ backgroundColor: colors.background }}>
-        <p className="text-lg mb-4" style={{ color: colors.heading }}>Conversation not found</p>
-        <Link href="/messages" className="px-4 py-2 rounded-lg" style={{ backgroundColor: colors.accent, color: colors.white }}>
+      <div
+        className="min-h-screen flex flex-col items-center justify-center"
+        style={{ backgroundColor: colors.background }}
+      >
+        <p className="text-lg mb-4" style={{ color: colors.heading }}>
+          Conversation not found
+        </p>
+        <Link
+          href="/messages"
+          className="px-4 py-2 rounded-lg"
+          style={{ backgroundColor: colors.accent, color: colors.white }}
+        >
           Back to Messages
         </Link>
       </div>
@@ -425,7 +465,10 @@ function ChatContent() {
   }
 
   return (
-    <div className="flex flex-col h-screen" style={{ backgroundColor: colors.background }}>
+    <div
+      className="flex flex-col h-screen"
+      style={{ backgroundColor: colors.background }}
+    >
       {/* Header */}
       <div
         className="sticky top-0 z-40 border-b flex-shrink-0"
@@ -464,13 +507,19 @@ function ChatContent() {
                 {conversation.participant.is_online && (
                   <div
                     className="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2"
-                    style={{ backgroundColor: colors.success, borderColor: colors.white }}
+                    style={{
+                      backgroundColor: colors.success,
+                      borderColor: colors.white,
+                    }}
                   />
                 )}
               </div>
 
               <div className="min-w-0">
-                <h2 className="font-medium text-sm truncate" style={{ color: colors.heading }}>
+                <h2
+                  className="font-medium text-sm truncate"
+                  style={{ color: colors.heading }}
+                >
                   {conversation.participant.name}
                 </h2>
                 <p className="text-xs" style={{ color: colors.body }}>
@@ -487,7 +536,9 @@ function ChatContent() {
             <div className="flex items-center gap-2">
               <div
                 className="w-2 h-2 rounded-full"
-                style={{ backgroundColor: isConnected ? colors.success : colors.body }}
+                style={{
+                  backgroundColor: isConnected ? colors.success : colors.body,
+                }}
                 title={isConnected ? "Real-time connected" : "Polling mode"}
               />
               <div className="relative">
@@ -501,10 +552,16 @@ function ChatContent() {
 
                 {showMenu && (
                   <>
-                    <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setShowMenu(false)}
+                    />
                     <div
                       className="absolute right-0 top-full mt-1 w-48 rounded-lg shadow-lg border z-50"
-                      style={{ backgroundColor: colors.white, borderColor: colors.border }}
+                      style={{
+                        backgroundColor: colors.white,
+                        borderColor: colors.border,
+                      }}
                     >
                       <Link
                         href={`/farmers/${conversation.participant.user_id}`}
@@ -529,10 +586,16 @@ function ChatContent() {
               style={{ backgroundColor: colors.successBg }}
             >
               <Package size={16} style={{ color: colors.accent }} />
-              <span className="text-sm font-medium" style={{ color: colors.accent }}>
+              <span
+                className="text-sm font-medium"
+                style={{ color: colors.accent }}
+              >
                 Order {conversation.order.order_number}
               </span>
-              <span className="text-xs px-2 py-0.5 rounded-full capitalize" style={{ backgroundColor: colors.white, color: colors.accent }}>
+              <span
+                className="text-xs px-2 py-0.5 rounded-full capitalize"
+                style={{ backgroundColor: colors.white, color: colors.accent }}
+              >
                 {conversation.order.status.replace("_", " ")}
               </span>
             </Link>
@@ -543,7 +606,10 @@ function ChatContent() {
             <Link
               href={`/products/${conversation.product.slug || conversation.product.id}`}
               className="mt-2 flex items-center gap-3 px-3 py-2 rounded-lg"
-              style={{ backgroundColor: "#f0fdf4", border: `1px solid ${colors.border}` }}
+              style={{
+                backgroundColor: "#f0fdf4",
+                border: `1px solid ${colors.border}`,
+              }}
             >
               {conversation.product.image ? (
                 <img
@@ -552,19 +618,32 @@ function ChatContent() {
                   className="w-10 h-10 rounded object-cover flex-shrink-0"
                 />
               ) : (
-                <div className="w-10 h-10 rounded flex items-center justify-center flex-shrink-0" style={{ backgroundColor: colors.successBg }}>
+                <div
+                  className="w-10 h-10 rounded flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: colors.successBg }}
+                >
                   <ShoppingBag size={18} style={{ color: colors.accent }} />
                 </div>
               )}
               <div className="min-w-0">
-                <p className="text-sm font-medium truncate" style={{ color: colors.heading }}>
+                <p
+                  className="text-sm font-medium truncate"
+                  style={{ color: colors.heading }}
+                >
                   {conversation.product.name}
                 </p>
                 <p className="text-xs" style={{ color: colors.accent }}>
-                  {conversation.product.currency} {Number(conversation.product.price).toLocaleString()}/{conversation.product.unit}
+                  {conversation.product.currency}{" "}
+                  {Number(conversation.product.price).toLocaleString()}/
+                  {conversation.product.unit}
                 </p>
               </div>
-              <span className="text-xs ml-auto flex-shrink-0" style={{ color: colors.body }}>View</span>
+              <span
+                className="text-xs ml-auto flex-shrink-0"
+                style={{ color: colors.body }}
+              >
+                View
+              </span>
             </Link>
           )}
         </div>
@@ -576,7 +655,10 @@ function ChatContent() {
           {Object.entries(groupedMessages).map(([date, dateMessages]) => (
             <div key={date}>
               <div className="flex items-center justify-center my-4">
-                <span className="px-3 py-1 text-xs rounded-full" style={{ backgroundColor: colors.border, color: colors.body }}>
+                <span
+                  className="px-3 py-1 text-xs rounded-full"
+                  style={{ backgroundColor: colors.border, color: colors.body }}
+                >
                   {date}
                 </span>
               </div>
@@ -587,35 +669,68 @@ function ChatContent() {
                   const isTemp = message.message_id.startsWith("temp-");
 
                   return (
-                    <div key={message.message_id} className={`flex ${isSent ? "justify-end" : "justify-start"}`}>
+                    <div
+                      key={message.message_id}
+                      className={`flex ${isSent ? "justify-end" : "justify-start"}`}
+                    >
                       <div
                         className={`max-w-[80%] px-4 py-2 rounded-2xl ${isSent ? "rounded-br-md" : "rounded-bl-md"}`}
                         style={{
-                          backgroundColor: isSent ? colors.messageSent : colors.messageReceived,
+                          backgroundColor: isSent
+                            ? colors.messageSent
+                            : colors.messageReceived,
                           color: isSent ? colors.white : colors.heading,
-                          border: isSent ? "none" : `1px solid ${colors.border}`,
+                          border: isSent
+                            ? "none"
+                            : `1px solid ${colors.border}`,
                           opacity: isTemp ? 0.7 : 1,
                         }}
                       >
-                        <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
-                        <div className={`flex items-center gap-1 mt-1 ${isSent ? "justify-end" : "justify-start"}`}>
-                          <span className="text-[10px]" style={{ color: isSent ? "rgba(255,255,255,0.7)" : colors.body }}>
+                        <p className="text-sm whitespace-pre-wrap break-words">
+                          {message.content}
+                        </p>
+                        <div
+                          className={`flex items-center gap-1 mt-1 ${isSent ? "justify-end" : "justify-start"}`}
+                        >
+                          <span
+                            className="text-[10px]"
+                            style={{
+                              color: isSent
+                                ? "rgba(255,255,255,0.7)"
+                                : colors.body,
+                            }}
+                          >
                             {formatTime(message.timestamp)}
                           </span>
                           {message.is_edited && (
-                            <span className="text-[10px]" style={{ color: isSent ? "rgba(255,255,255,0.7)" : colors.body }}>
+                            <span
+                              className="text-[10px]"
+                              style={{
+                                color: isSent
+                                  ? "rgba(255,255,255,0.7)"
+                                  : colors.body,
+                              }}
+                            >
                               • edited
                             </span>
                           )}
-                          {isSent && (
-                            isTemp ? (
-                              <Clock size={12} style={{ color: "rgba(255,255,255,0.7)" }} />
+                          {isSent &&
+                            (isTemp ? (
+                              <Clock
+                                size={12}
+                                style={{ color: "rgba(255,255,255,0.7)" }}
+                              />
                             ) : message.is_read ? (
-                              <CheckCheck size={14} style={{ color: colors.successBg }} />
+                              <CheckCheck
+                                size={14}
+                                style={{ color: colors.successBg }}
+                              />
                             ) : (
-                              <Check size={14} style={{ color: "rgba(255,255,255,0.7)" }} />
-                            )
-                          )}
+                              <Check
+                                size={14}
+                                style={{ color: "rgba(255,255,255,0.7)" }}
+                              />
+                            ))}
                         </div>
                       </div>
                     </div>
@@ -630,12 +745,33 @@ function ChatContent() {
             <div className="flex justify-start">
               <div
                 className="px-4 py-3 rounded-2xl rounded-bl-md"
-                style={{ backgroundColor: colors.messageReceived, border: `1px solid ${colors.border}` }}
+                style={{
+                  backgroundColor: colors.messageReceived,
+                  border: `1px solid ${colors.border}`,
+                }}
               >
                 <div className="flex gap-1 items-center">
-                  <span className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: colors.body, animationDelay: "0ms" }} />
-                  <span className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: colors.body, animationDelay: "150ms" }} />
-                  <span className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: colors.body, animationDelay: "300ms" }} />
+                  <span
+                    className="w-2 h-2 rounded-full animate-bounce"
+                    style={{
+                      backgroundColor: colors.body,
+                      animationDelay: "0ms",
+                    }}
+                  />
+                  <span
+                    className="w-2 h-2 rounded-full animate-bounce"
+                    style={{
+                      backgroundColor: colors.body,
+                      animationDelay: "150ms",
+                    }}
+                  />
+                  <span
+                    className="w-2 h-2 rounded-full animate-bounce"
+                    style={{
+                      backgroundColor: colors.body,
+                      animationDelay: "300ms",
+                    }}
+                  />
                 </div>
               </div>
             </div>
@@ -650,8 +786,14 @@ function ChatContent() {
         className="sticky bottom-0 border-t flex-shrink-0"
         style={{ backgroundColor: colors.white, borderColor: colors.border }}
       >
-        <form onSubmit={handleSendMessage} className="max-w-2xl mx-auto px-4 py-3">
-          <div className="flex items-end gap-2 p-2 rounded-2xl" style={{ backgroundColor: colors.background }}>
+        <form
+          onSubmit={handleSendMessage}
+          className="max-w-2xl mx-auto px-4 py-3"
+        >
+          <div
+            className="flex items-end gap-2 p-2 rounded-2xl"
+            style={{ backgroundColor: colors.background }}
+          >
             <button
               type="button"
               className="p-2 rounded-full transition-colors hover:bg-zinc-200"
@@ -682,11 +824,17 @@ function ChatContent() {
               disabled={!newMessage.trim() || isSending}
               className="p-2 rounded-full transition-colors disabled:opacity-50"
               style={{
-                backgroundColor: newMessage.trim() ? colors.accent : colors.border,
+                backgroundColor: newMessage.trim()
+                  ? colors.accent
+                  : colors.border,
                 color: colors.white,
               }}
             >
-              {isSending ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
+              {isSending ? (
+                <Loader2 size={20} className="animate-spin" />
+              ) : (
+                <Send size={20} />
+              )}
             </button>
           </div>
         </form>
@@ -699,8 +847,15 @@ export default function ChatPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#FAFAF9" }}>
-          <Loader2 size={32} className="animate-spin" style={{ color: "#166534" }} />
+        <div
+          className="min-h-screen flex items-center justify-center"
+          style={{ backgroundColor: "#FAFAF9" }}
+        >
+          <Loader2
+            size={32}
+            className="animate-spin"
+            style={{ color: "#166534" }}
+          />
         </div>
       }
     >

@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
-import { verifyAuth } from "@/lib/auth";
-import { handleRouteError } from "@/lib/errors";
-import { successResponse } from "@/lib/helpers/response";
-import { BUSINESS } from "@/config/constants";
+import prisma from "@/core/database/prisma";
+import { verifyAuth } from "@/features/auth";
+import { handleRouteError } from "@/core/errors";
+import { successResponse } from "@/core/helpers/response";
+import { BUSINESS } from "@/core/config/constants";
 
 /**
  * @swagger

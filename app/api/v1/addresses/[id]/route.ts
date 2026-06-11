@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
-import { verifyAuth } from "@/lib/auth";
-import { AppError, handleRouteError } from "@/lib/errors";
-import { successResponse } from "@/lib/helpers/response";
+import prisma from "@/core/database/prisma";
+import { verifyAuth } from "@/features/auth";
+import { AppError, handleRouteError } from "@/core/errors";
+import { successResponse } from "@/core/helpers/response";
 
 /**
  * @swagger
@@ -77,7 +77,7 @@ export async function PUT(
       postal_code,
       latitude,
       longitude,
-      is_primary
+      is_primary,
     } = body;
 
     const address = await prisma.address.findUnique({ where: { id } });
@@ -93,7 +93,11 @@ export async function PUT(
     // Geograhical Master Data Check if ANY of the IDs are provided
     let updatedProvinceName, updatedCityName, updatedDistrictName;
 
-    if (province_id !== undefined || city_id !== undefined || district_id !== undefined) {
+    if (
+      province_id !== undefined ||
+      city_id !== undefined ||
+      district_id !== undefined
+    ) {
       const pId = province_id ?? address.provinceId;
       const cId = city_id ?? address.cityId;
       const dId = district_id ?? address.districtId;
@@ -128,9 +132,18 @@ export async function PUT(
         ...(phone !== undefined && { phone }),
         ...(full_address !== undefined && { fullAddress: full_address }),
         ...(notes !== undefined && { notes }),
-        ...(province_id !== undefined && { provinceId: province_id, province: updatedProvinceName }),
-        ...(city_id !== undefined && { cityId: city_id, city: updatedCityName }),
-        ...(district_id !== undefined && { districtId: district_id, district: updatedDistrictName }),
+        ...(province_id !== undefined && {
+          provinceId: province_id,
+          province: updatedProvinceName,
+        }),
+        ...(city_id !== undefined && {
+          cityId: city_id,
+          city: updatedCityName,
+        }),
+        ...(district_id !== undefined && {
+          districtId: district_id,
+          district: updatedDistrictName,
+        }),
         ...(postal_code !== undefined && { postalCode: postal_code }),
         ...(latitude !== undefined && { latitude }),
         ...(longitude !== undefined && { longitude }),
@@ -139,7 +152,11 @@ export async function PUT(
     });
 
     return successResponse(
-      { address_id: updated.id, label: updated.label, updated_at: updated.updatedAt },
+      {
+        address_id: updated.id,
+        label: updated.label,
+        updated_at: updated.updatedAt,
+      },
       { message: "Address updated successfully" },
     );
   } catch (error) {
@@ -188,7 +205,9 @@ export async function DELETE(
 
     await prisma.address.delete({ where: { id } });
 
-    return successResponse(undefined, { message: "Address deleted successfully" });
+    return successResponse(undefined, {
+      message: "Address deleted successfully",
+    });
   } catch (error) {
     return handleRouteError(error, "Delete address");
   }

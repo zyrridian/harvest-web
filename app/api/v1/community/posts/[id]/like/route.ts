@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
-import { verifyAuth } from "@/lib/auth";
-import { AppError, handleRouteError } from "@/lib/errors";
-import { successResponse } from "@/lib/helpers/response";
+import prisma from "@/core/database/prisma";
+import { verifyAuth } from "@/features/auth";
+import { AppError, handleRouteError } from "@/core/errors";
+import { successResponse } from "@/core/helpers/response";
 
 /**
  * @swagger
@@ -27,11 +27,15 @@ export async function POST(
     const existingLike = await prisma.postLike.findUnique({
       where: { postId_userId: { postId: id, userId: user.userId } },
     });
-    if (existingLike) throw AppError.badRequest("You have already liked this post");
+    if (existingLike)
+      throw AppError.badRequest("You have already liked this post");
 
     await prisma.$transaction([
       prisma.postLike.create({ data: { postId: id, userId: user.userId } }),
-      prisma.communityPost.update({ where: { id }, data: { likesCount: { increment: 1 } } }),
+      prisma.communityPost.update({
+        where: { id },
+        data: { likesCount: { increment: 1 } },
+      }),
     ]);
 
     return successResponse(undefined, { message: "Post liked successfully" });
@@ -63,11 +67,17 @@ export async function DELETE(
     const existingLike = await prisma.postLike.findUnique({
       where: { postId_userId: { postId: id, userId: user.userId } },
     });
-    if (!existingLike) throw AppError.badRequest("You have not liked this post");
+    if (!existingLike)
+      throw AppError.badRequest("You have not liked this post");
 
     await prisma.$transaction([
-      prisma.postLike.delete({ where: { postId_userId: { postId: id, userId: user.userId } } }),
-      prisma.communityPost.update({ where: { id }, data: { likesCount: { decrement: 1 } } }),
+      prisma.postLike.delete({
+        where: { postId_userId: { postId: id, userId: user.userId } },
+      }),
+      prisma.communityPost.update({
+        where: { id },
+        data: { likesCount: { decrement: 1 } },
+      }),
     ]);
 
     return successResponse(undefined, { message: "Post unliked successfully" });

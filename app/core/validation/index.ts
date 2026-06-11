@@ -1,5 +1,5 @@
-export { LoginSchema, RegisterSchema } from "./schemas/auth.schema";
-export type { LoginInput, RegisterInput } from "./schemas/auth.schema";
+export { LoginSchema, RegisterSchema } from "../../features/auth/validation/auth.schema";
+export type { LoginInput, RegisterInput } from "../../features/auth/validation/auth.schema";
 
 export { CreateOrderSchema } from "./schemas/order.schema";
 export type { CreateOrderInput } from "./schemas/order.schema";

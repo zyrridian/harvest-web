@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import prisma from "@/core/database/prisma";
 
 /**
  * @swagger
@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
           type: "product",
           text: p.name,
           id: p.id,
-        }))
+        })),
       );
     }
 
@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
           type: "category",
           text: c.name,
           id: c.id,
-        }))
+        })),
       );
     }
 
@@ -114,7 +114,7 @@ export async function GET(request: NextRequest) {
           type: "farmer",
           text: f.name,
           id: f.farmer?.id || f.id,
-        }))
+        })),
       );
     }
 
@@ -129,7 +129,7 @@ export async function GET(request: NextRequest) {
     console.error("Search suggestions error:", error);
     return NextResponse.json(
       { status: "error", message: "Failed to get suggestions" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

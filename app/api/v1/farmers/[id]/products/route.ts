@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import prisma from "@/core/database/prisma";
 
 /**
  * @swagger
@@ -31,13 +31,13 @@ import prisma from "@/lib/prisma";
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-        // Await params in Next.js 15+
+    // Await params in Next.js 15+
     const { id } = await params;
 
-const { searchParams } = new URL(request.url);
+    const { searchParams } = new URL(request.url);
 
     // Pagination
     const page = parseInt(searchParams.get("page") || "1");
@@ -56,7 +56,7 @@ const { searchParams } = new URL(request.url);
           status: "error",
           message: "Farmer not found",
         },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -142,7 +142,7 @@ const { searchParams } = new URL(request.url);
         message: "Failed to fetch farmer products",
         error: error.message,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

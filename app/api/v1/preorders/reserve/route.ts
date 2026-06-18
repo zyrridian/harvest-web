@@ -3,18 +3,18 @@ import { verifyAuth } from "@/features/auth";
 import { handleRouteError } from "@/core/errors";
 import { successResponse } from "@/core/helpers/response";
 import { parseBody } from "@/core/helpers/parseBody";
-import { AddCartItemSchema } from "@/features/cart/application/dtos/cart.dto";
-import { AddCartItemUseCase } from "@/features/cart/application/usecases/add-cart-item.usecase";
-import { cartRepository } from "@/features/cart/infrastructure/repositories/prisma-cart.repository";
+import { ReservePreOrderSchema } from "@/features/preorder/application/dtos/preorder.dto";
+import { ReservePreOrderUseCase } from "@/features/preorder/application/usecases/reserve-preorder.usecase";
+import { preOrderRepository } from "@/features/preorder/infrastructure/repositories/prisma-preorder.repository";
 
 /**
  * @swagger
- * /api/v1/cart/items:
+ * /api/v1/preorders/reserve:
  *   post:
- *     summary: Add item to cart
- *     description: Adds a product to the user's cart
+ *     summary: Reserve a pre-order
+ *     description: Creates a new reservation for a harvest product
  *     tags:
- *       - Cart
+ *       - PreOrder
  *     security:
  *       - BearerAuth: []
  *     requestBody:
@@ -24,26 +24,26 @@ import { cartRepository } from "@/features/cart/infrastructure/repositories/pris
  *           schema:
  *             type: object
  *             properties:
- *               product_id:
+ *               harvest_id:
  *                 type: string
  *               quantity:
  *                 type: integer
  *     responses:
  *       200:
- *         description: Cart item added successfully
+ *         description: Reservation created successfully
  */
 export async function POST(request: NextRequest) {
   try {
     const payload = await verifyAuth(request);
     
     const body = await parseBody(request);
-    const input = AddCartItemSchema.parse(body);
+    const input = ReservePreOrderSchema.parse(body);
 
-    const useCase = new AddCartItemUseCase(cartRepository);
+    const useCase = new ReservePreOrderUseCase(preOrderRepository);
     const result = await useCase.execute(payload.userId, input);
 
     return successResponse(result);
   } catch (error) {
-    return handleRouteError(error, "AddCartItem");
+    return handleRouteError(error, "ReservePreOrder");
   }
 }

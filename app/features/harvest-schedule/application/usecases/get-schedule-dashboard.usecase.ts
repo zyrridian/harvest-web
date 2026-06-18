@@ -32,7 +32,15 @@ export class GetHarvestScheduleDashboardUseCase {
 
       const badges = [];
       if (order.status === "confirmed" || order.paymentStatus === "paid") badges.push("Pre-ordered");
-      if (isToday || harvestDate <= now) badges.push("Ready to pick");
+      if (isToday) badges.push("Ready today");
+      else if (harvestDate <= now) badges.push("Ready to pick");
+      
+      if (order.status === "pending_payment") badges.push("Pending confirmation");
+      
+      const oneDay = 24 * 60 * 60 * 1000;
+      if (order.createdAt && (now.getTime() - order.createdAt.getTime()) < oneDay) {
+        badges.push("Just reserved");
+      }
 
       let action1 = "Chat\\nfarmer";
       let action2 = "Pay\\ndeposit";

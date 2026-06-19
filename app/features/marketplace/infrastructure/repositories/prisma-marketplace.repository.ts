@@ -152,6 +152,14 @@ export class PrismaMarketplaceRepository implements IMarketplaceRepository {
   private toRad(value: number): number {
     return (value * Math.PI) / 180;
   }
+
+  async getUserFavoriteProductIds(userId: string): Promise<string[]> {
+    const favorites = await prisma.favorite.findMany({
+      where: { userId },
+      select: { productId: true },
+    });
+    return favorites.map((f) => f.productId);
+  }
 }
 
 export const marketplaceRepository = new PrismaMarketplaceRepository();

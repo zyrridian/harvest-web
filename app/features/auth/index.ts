@@ -12,7 +12,7 @@ export {
   comparePassword,
 } from "./application/services/password.service";
 
-export { verifyAuth, verifyAdmin } from "./infrastructure/guards/auth.guard";
+export { verifyAuth, verifyAdmin, getOptionalAuth } from "./infrastructure/guards/auth.guard";
 
 // Re-export the TokenPayload type for convenience
 export type { TokenPayload } from "@/core/types/auth";

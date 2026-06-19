@@ -1,6 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { verifyAuth } from "@/features/auth";
-import prisma from "@/core/database/prisma";
+import { handleRouteError } from "@/core/errors";
+import { successResponse } from "@/core/helpers/response";
+import { favoriteRepository } from "@/features/products/infrastructure/repositories/prisma-favorite.repository";
+import { RemoveFavoriteByIdUseCase } from "@/features/products/application/usecases/favorite.usecases";
 
 /**
  * @swagger
@@ -27,45 +30,18 @@ import prisma from "@/core/database/prisma";
  */
 export async function DELETE(
   request: NextRequest,
-  context: { params: Promise<{ id: string }> },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const { id } = await params;
     const payload = await verifyAuth(request);
-    const { id } = await context.params;
+    const userId = payload.userId as string;
 
-    // Find and verify ownership
-    const favorite = await prisma.favorite.findUnique({
-      where: { id },
-    });
+    const useCase = new RemoveFavoriteByIdUseCase(favoriteRepository);
+    await useCase.execute(userId, id);
 
-    if (!favorite) {
-      return NextResponse.json(
-        { status: "error", message: "Favorite not found" },
-        { status: 404 },
-      );
-    }
-
-    if (favorite.userId !== payload.userId) {
-      return NextResponse.json(
-        { status: "error", message: "Unauthorized" },
-        { status: 403 },
-      );
-    }
-
-    // Delete favorite
-    await prisma.favorite.delete({
-      where: { id },
-    });
-
-    return NextResponse.json({
-      status: "success",
-      message: "Favorite removed",
-    });
-  } catch (error: any) {
-    console.error("Delete favorite error:", error);
-    return NextResponse.json(
-      { status: "error", message: "Failed to remove favorite" },
-      { status: 500 },
-    );
+    return successResponse(null, { message: "Favorite removed" });
+  } catch (error) {
+    return handleRouteError(error, "RemoveFavoriteById");
   }
 }

@@ -4,6 +4,7 @@ import { successResponse } from "@/core/helpers/response";
 import { GetMarketplaceQuerySchema } from "@/features/marketplace/application/dtos/marketplace.dto";
 import { GetMarketplaceUseCase } from "@/features/marketplace/application/usecases/get-marketplace.usecase";
 import { marketplaceRepository } from "@/features/marketplace/infrastructure/repositories/prisma-marketplace.repository";
+import { getOptionalAuth } from "@/features/auth";
 
 /**
  * @swagger
@@ -56,7 +57,13 @@ export async function GET(request: NextRequest) {
       limit: searchParams.get("limit") || undefined,
     };
 
-    const input = GetMarketplaceQuerySchema.parse(rawInput);
+    const payload = await getOptionalAuth(request);
+    
+    const input = GetMarketplaceQuerySchema.parse({
+      ...rawInput,
+      userId: payload?.userId,
+    });
+    
     const useCase = new GetMarketplaceUseCase(marketplaceRepository);
     const result = await useCase.execute(input);
 

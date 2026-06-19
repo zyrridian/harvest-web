@@ -21,4 +21,5 @@ export interface IMarketplaceRepository {
       longitude?: number;
     }
   ): Promise<ProductWithRelations[]>;
+  getUserFavoriteProductIds(userId: string): Promise<string[]>;
 }

@@ -1,6 +1,13 @@
-import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/core/database/prisma";
-import { verifyToken, extractBearerToken } from "@/features/auth";
+import { NextRequest } from "next/server";
+import { verifyAuth } from "@/features/auth";
+import { handleRouteError } from "@/core/errors";
+import { successResponse } from "@/core/helpers/response";
+import { favoriteRepository } from "@/features/products/infrastructure/repositories/prisma-favorite.repository";
+import { 
+  CheckFavoriteUseCase, 
+  AddFavoriteUseCase, 
+  RemoveFavoriteUseCase 
+} from "@/features/products/application/usecases/favorite.usecases";
 
 /**
  * @swagger
@@ -28,51 +35,15 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-
-    const authHeader = request.headers.get("authorization");
-    const token = extractBearerToken(authHeader);
-    if (!token) {
-      return NextResponse.json(
-        { status: "error", message: "Unauthorized" },
-        { status: 401 },
-      );
-    }
-
-    const payload = await verifyToken(token);
-    if (!payload) {
-      return NextResponse.json(
-        { status: "error", message: "Invalid token" },
-        { status: 401 },
-      );
-    }
+    const payload = await verifyAuth(request);
     const userId = payload.userId as string;
 
-    const favorite = await prisma.favorite.findUnique({
-      where: {
-        userId_productId: {
-          userId,
-          productId: id,
-        },
-      },
-    });
+    const useCase = new CheckFavoriteUseCase(favoriteRepository);
+    const result = await useCase.execute(userId, id);
 
-    return NextResponse.json({
-      status: "success",
-      data: {
-        product_id: id,
-        is_favorited: !!favorite,
-      },
-    });
-  } catch (error: any) {
-    console.error("Error checking favorite status:", error);
-    return NextResponse.json(
-      {
-        status: "error",
-        message: "Failed to check favorite status",
-        error: error.message,
-      },
-      { status: 500 },
-    );
+    return successResponse(result);
+  } catch (error) {
+    return handleRouteError(error, "CheckFavorite");
   }
 }
 
@@ -101,87 +72,16 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    // Await params in Next.js 15+
     const { id } = await params;
-
-    // Verify authentication
-    const authHeader = request.headers.get("authorization");
-    const token = extractBearerToken(authHeader);
-    if (!token) {
-      return NextResponse.json(
-        { status: "error", message: "Unauthorized" },
-        { status: 401 },
-      );
-    }
-
-    const payload = await verifyToken(token);
-    if (!payload) {
-      return NextResponse.json(
-        { status: "error", message: "Invalid token" },
-        { status: 401 },
-      );
-    }
+    const payload = await verifyAuth(request);
     const userId = payload.userId as string;
 
-    // Check if product exists
-    const product = await prisma.product.findUnique({
-      where: { id: id },
-    });
+    const useCase = new AddFavoriteUseCase(favoriteRepository);
+    const result = await useCase.execute(userId, id);
 
-    if (!product) {
-      return NextResponse.json(
-        { status: "error", message: "Product not found" },
-        { status: 404 },
-      );
-    }
-
-    // Check if already favorited
-    const existingFavorite = await prisma.favorite.findUnique({
-      where: {
-        userId_productId: {
-          userId,
-          productId: id,
-        },
-      },
-    });
-
-    if (existingFavorite) {
-      return NextResponse.json({
-        status: "success",
-        message: "Product already in favorites",
-        data: {
-          product_id: id,
-          is_favorited: true,
-        },
-      });
-    }
-
-    // Add to favorites
-    await prisma.favorite.create({
-      data: {
-        userId,
-        productId: id,
-      },
-    });
-
-    return NextResponse.json({
-      status: "success",
-      message: "Product added to favorites",
-      data: {
-        product_id: id,
-        is_favorited: true,
-      },
-    });
-  } catch (error: any) {
-    console.error("Error adding favorite:", error);
-    return NextResponse.json(
-      {
-        status: "error",
-        message: "Failed to add favorite",
-        error: error.message,
-      },
-      { status: 500 },
-    );
+    return successResponse(result, { message: "Product added to favorites" });
+  } catch (error) {
+    return handleRouteError(error, "AddFavorite");
   }
 }
 
@@ -211,50 +111,14 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    // Verify authentication
-    const authHeader = request.headers.get("authorization");
-    const token = extractBearerToken(authHeader);
-    if (!token) {
-      return NextResponse.json(
-        { status: "error", message: "Unauthorized" },
-        { status: 401 },
-      );
-    }
-
-    const payload = await verifyToken(token);
-    if (!payload) {
-      return NextResponse.json(
-        { status: "error", message: "Invalid token" },
-        { status: 401 },
-      );
-    }
+    const payload = await verifyAuth(request);
     const userId = payload.userId as string;
 
-    // Remove from favorites
-    await prisma.favorite.deleteMany({
-      where: {
-        userId,
-        productId: id,
-      },
-    });
+    const useCase = new RemoveFavoriteUseCase(favoriteRepository);
+    const result = await useCase.execute(userId, id);
 
-    return NextResponse.json({
-      status: "success",
-      message: "Product removed from favorites",
-      data: {
-        product_id: id,
-        is_favorited: false,
-      },
-    });
-  } catch (error: any) {
-    console.error("Error removing favorite:", error);
-    return NextResponse.json(
-      {
-        status: "error",
-        message: "Failed to remove favorite",
-        error: error.message,
-      },
-      { status: 500 },
-    );
+    return successResponse(result, { message: "Product removed from favorites" });
+  } catch (error) {
+    return handleRouteError(error, "RemoveFavorite");
   }
 }

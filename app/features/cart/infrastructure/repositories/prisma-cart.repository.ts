@@ -3,30 +3,45 @@ import prisma from "@/core/database/prisma";
 import { Product } from "@/generated/prisma/client";
 
 export class PrismaCartRepository implements ICartRepository {
-  async findCartByUserId(userId: string): Promise<CartWithItems | null> {
-    return prisma.cart.findUnique({
-      where: { userId },
+  private cartInclude = {
+    items: {
       include: {
-        items: {
+        product: {
           include: {
-            product: true,
+            seller: {
+              select: { id: true, name: true, avatarUrl: true },
+            },
+            images: {
+              where: { isPrimary: true },
+              take: 1,
+            },
+            discounts: {
+              where: {
+                isActive: true,
+                validFrom: { lte: new Date() },
+                validUntil: { gte: new Date() },
+              },
+              take: 1,
+              orderBy: { value: "desc" as const },
+            },
           },
         },
       },
-    });
+    },
+  };
+
+  async findCartByUserId(userId: string): Promise<CartWithItems | null> {
+    return prisma.cart.findUnique({
+      where: { userId },
+      include: this.cartInclude,
+    }) as any;
   }
 
   async createCart(userId: string): Promise<CartWithItems> {
     return prisma.cart.create({
       data: { userId },
-      include: {
-        items: {
-          include: {
-            product: true,
-          },
-        },
-      },
-    });
+      include: this.cartInclude,
+    }) as any;
   }
 
   async addOrUpdateCartItem(cartId: string, productId: string, quantity: number, unitPrice: number): Promise<void> {

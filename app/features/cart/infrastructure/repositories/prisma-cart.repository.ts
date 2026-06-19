@@ -77,6 +77,63 @@ export class PrismaCartRepository implements ICartRepository {
   async findProductById(productId: string): Promise<Product | null> {
     return prisma.product.findUnique({ where: { id: productId } });
   }
+
+  async clearCart(userId: string): Promise<void> {
+    await prisma.cartItem.deleteMany({
+      where: { cart: { userId } },
+    });
+  }
+
+  async findCartItemById(cartItemId: string): Promise<any> {
+    return prisma.cartItem.findUnique({
+      where: { id: cartItemId },
+      include: {
+        cart: true,
+        product: {
+          select: {
+            id: true,
+            price: true,
+            stockQuantity: true,
+            minimumOrder: true,
+            maximumOrder: true,
+            discounts: {
+              where: {
+                isActive: true,
+                validFrom: { lte: new Date() },
+                validUntil: { gte: new Date() },
+              },
+              take: 1,
+              orderBy: { value: "desc" },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  async updateCartItem(cartItemId: string, data: any): Promise<any> {
+    return prisma.cartItem.update({
+      where: { id: cartItemId },
+      data,
+    });
+  }
+
+  async removeCartItem(cartItemId: string): Promise<void> {
+    await prisma.cartItem.delete({ where: { id: cartItemId } });
+  }
+
+  async updateCartUpdatedAt(cartId: string): Promise<void> {
+    await prisma.cart.update({
+      where: { id: cartId },
+      data: { updatedAt: new Date() },
+    });
+  }
+
+  async getCartItems(cartId: string): Promise<any[]> {
+    return prisma.cartItem.findMany({
+      where: { cartId },
+    });
+  }
 }
 
 export const cartRepository = new PrismaCartRepository();

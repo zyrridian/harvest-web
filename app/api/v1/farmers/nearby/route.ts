@@ -23,53 +23,23 @@ function calculateDistance(
   return R * c;
 }
 
-/**
- * @swagger
- * /api/v1/farmers/nearby:
- *   get:
- *     summary: Get nearby farmers based on location
- *     tags: [Farmers]
- *     parameters:
- *       - in: query
- *         name: latitude
- *         required: true
- *         schema:
- *           type: number
- *       - in: query
- *         name: longitude
- *         required: true
- *         schema:
- *           type: number
- *       - in: query
- *         name: radius
- *         schema:
- *           type: number
- *           default: 10
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 20
- *     responses:
- *       200:
- *         description: List of nearby farmers
- *       400:
- *         description: Missing required parameters
- */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
 
     const latitude = searchParams.get("latitude");
     const longitude = searchParams.get("longitude");
-    const radius = parseFloat(searchParams.get("radius") || "10");
+    const radius = parseFloat(searchParams.get("radius_km") || "3");
     const limit = parseInt(searchParams.get("limit") || "20");
+    const searchQuery = searchParams.get("search")?.toLowerCase();
+    const tagsParam = searchParams.get("tags");
+    const isOpenParam = searchParams.get("is_open");
 
     if (!latitude || !longitude) {
       return NextResponse.json(
         {
           status: "error",
-          message: "Latitude and longitude are required",
+          message: "latitude and longitude are required",
         },
         { status: 400 },
       );
@@ -78,63 +48,95 @@ export async function GET(request: NextRequest) {
     const userLat = parseFloat(latitude);
     const userLon = parseFloat(longitude);
 
-    // Get all farmers with location data
-    const farmers = await prisma.farmer.findMany({
-      where: {
-        latitude: { not: null },
-        longitude: { not: null },
-      },
+    // Filter by open status if requested
+    const whereClause: any = {};
+    if (isOpenParam === "true") {
+      whereClause.isActive = true;
+    }
+
+    // Get all drop points with related farmer and products
+    const dropPoints = await prisma.dropPoint.findMany({
+      where: whereClause,
       include: {
-        user: {
-          select: {
-            isOnline: true,
+        farmer: {
+          include: {
+            user: {
+              include: {
+                products: {
+                  where: { isAvailable: true },
+                  select: { name: true },
+                  take: 2,
+                },
+                _count: {
+                  select: { products: { where: { isAvailable: true } } },
+                },
+              },
+            },
           },
         },
       },
     });
 
-    // Calculate distances and filter by radius
-    const farmersWithDistance = farmers
-      .map((farmer) => {
-        if (farmer.latitude === null || farmer.longitude === null) {
-          return null;
-        }
-
+    // Calculate distances, filter by search/tags/radius, and map to payload
+    const processedPoints = dropPoints
+      .map((dp) => {
         const distance = calculateDistance(
           userLat,
           userLon,
-          farmer.latitude,
-          farmer.longitude,
+          dp.latitude,
+          dp.longitude,
         );
-
-        return {
-          ...farmer,
-          distance,
-        };
+        return { ...dp, distance };
       })
-      .filter(
-        (farmer): farmer is NonNullable<typeof farmer> =>
-          farmer !== null && farmer.distance <= radius,
-      )
+      .filter((dp) => dp.distance <= radius)
+      .filter((dp) => {
+        // Search filter (name or farmer name)
+        if (searchQuery) {
+          const matchName = dp.name.toLowerCase().includes(searchQuery);
+          const matchFarmer = dp.farmer.name.toLowerCase().includes(searchQuery);
+          if (!matchName && !matchFarmer) return false;
+        }
+        // Tags filter
+        if (tagsParam) {
+          const requestedTags = tagsParam.split(",").map((t) => t.trim());
+          const hasTag = requestedTags.some((rt) => dp.tags.includes(rt));
+          if (!hasTag) return false;
+        }
+        return true;
+      })
       .sort((a, b) => a.distance - b.distance)
       .slice(0, limit);
 
-    const formattedFarmers = farmersWithDistance.map((farmer) => ({
-      id: farmer.id,
-      user_id: farmer.userId,
-      name: farmer.name,
-      profile_image: farmer.profileImage,
-      latitude: farmer.latitude,
-      longitude: farmer.longitude,
-      city: farmer.city,
-      rating: farmer.rating,
-      distance: Math.round(farmer.distance * 10) / 10, // Round to 1 decimal
-      is_verified: farmer.isVerified,
-    }));
+    const formattedData = processedPoints.map((dp) => {
+      const extraProductsCount = dp.farmer.user._count.products - dp.farmer.user.products.length;
+      
+      return {
+        id: dp.id,
+        farmer_id: dp.farmerId,
+        user_id: dp.farmer.userId,
+        name: dp.name,
+        distance: Math.round(dp.distance * 10) / 10,
+        category: dp.whatWeSell || "Produce",
+        sub_category: dp.tags.length > 0 ? dp.tags[0] : "",
+        rating: dp.farmer.rating,
+        review_count: dp.farmer.totalReviews,
+        tags: dp.tags,
+        products: dp.farmer.user.products,
+        extra_products_count: extraProductsCount > 0 ? extraProductsCount : 0,
+        status_text: dp.isActive ? "Open now" : "Closed",
+        status_sub_text: dp.isActive ? "" : "Check back later",
+        is_open: dp.isActive,
+        latitude: dp.latitude,
+        longitude: dp.longitude,
+        image_url: dp.imageUrl || dp.farmer.profileImage,
+      };
+    });
 
     return NextResponse.json({
       status: "success",
-      data: formattedFarmers,
+      data: {
+        farmers: formattedData,
+      },
     });
   } catch (error: any) {
     console.error("Error fetching nearby farmers:", error);

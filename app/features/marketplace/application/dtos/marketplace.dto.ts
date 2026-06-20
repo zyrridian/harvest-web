@@ -7,6 +7,7 @@ export interface FlashHarvestDTO {
   subtitle: string;
   distance: string;
   image_url: string;
+  is_favorite?: boolean;
 }
 
 export interface CategoryDTO {
@@ -26,6 +27,7 @@ export interface ProductDTO {
   rating: number;
   sold_count: number;
   is_fresh: boolean;
+  is_favorite?: boolean;
 }
 
 export interface MarketplaceResponseDTO {
@@ -42,6 +44,7 @@ export const GetMarketplaceQuerySchema = z.object({
   search: z.string().optional(),
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(50).default(10),
+  userId: z.string().optional(),
 });
 
 export type GetMarketplaceInputDTO = z.infer<typeof GetMarketplaceQuerySchema>;

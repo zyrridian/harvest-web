@@ -5,11 +5,14 @@ export class GetMarketplaceUseCase {
   constructor(private readonly marketplaceRepo: IMarketplaceRepository) {}
 
   async execute(input: GetMarketplaceInputDTO): Promise<MarketplaceResponseDTO> {
-    const [flashHarvestData, categoriesData, productsData] = await Promise.all([
+    const [flashHarvestData, categoriesData, productsData, favoriteIds] = await Promise.all([
       this.marketplaceRepo.getFlashHarvest(input.latitude, input.longitude),
       this.marketplaceRepo.getCategories(),
       this.marketplaceRepo.getProducts(input),
+      input.userId ? this.marketplaceRepo.getUserFavoriteProductIds(input.userId) : Promise.resolve([]),
     ]);
+
+    const favoriteSet = new Set(favoriteIds);
 
     let flashHarvest: FlashHarvestDTO | null = null;
     if (flashHarvestData) {
@@ -19,6 +22,7 @@ export class GetMarketplaceUseCase {
         subtitle: flashHarvestData.isHarvest ? "Picked this morning" : "Limited Time Offer",
         distance: this.formatDistance((flashHarvestData as any).distance),
         image_url: flashHarvestData.images[0]?.url || "🍓",
+        is_favorite: favoriteSet.has(flashHarvestData.id),
       };
     }
 
@@ -42,6 +46,7 @@ export class GetMarketplaceUseCase {
       rating: p.rating,
       sold_count: p.viewCount, // Placeholder: Using viewCount as sold_count for demonstration
       is_fresh: p.isHarvest,
+      is_favorite: favoriteSet.has(p.id),
     }));
 
     return {

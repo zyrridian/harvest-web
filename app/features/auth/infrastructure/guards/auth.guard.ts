@@ -42,3 +42,23 @@ export async function verifyAdmin(request: NextRequest): Promise<TokenPayload> {
 
   return payload;
 }
+
+/**
+ * Optionally verify authentication from a NextRequest.
+ * Returns the payload if valid, null otherwise without throwing an error.
+ */
+export async function getOptionalAuth(request: NextRequest): Promise<TokenPayload | null> {
+  try {
+    const authHeader = request.headers.get("authorization");
+    const token = extractBearerToken(authHeader);
+
+    if (!token) {
+      return null;
+    }
+
+    const payload = await verifyToken(token);
+    return payload || null;
+  } catch (error) {
+    return null;
+  }
+}

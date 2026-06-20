@@ -10,4 +10,10 @@ export interface ICartRepository {
   addOrUpdateCartItem(cartId: string, productId: string, quantity: number, unitPrice: number): Promise<void>;
   getCartSummary(cartId: string): Promise<{ itemCount: number; total: number }>;
   findProductById(productId: string): Promise<Product | null>;
+  clearCart(userId: string): Promise<void>;
+  findCartItemById(cartItemId: string): Promise<any>;
+  updateCartItem(cartItemId: string, data: any): Promise<any>;
+  removeCartItem(cartItemId: string): Promise<void>;
+  updateCartUpdatedAt(cartId: string): Promise<void>;
+  getCartItems(cartId: string): Promise<any[]>;
 }

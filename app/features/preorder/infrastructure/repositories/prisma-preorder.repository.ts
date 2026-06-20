@@ -109,6 +109,9 @@ export class PrismaPreOrderRepository implements IPreOrderRepository {
 
       const orderNumber = `RES-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
+      const totalAmount = product.price * quantity;
+      const depositAmount = totalAmount * 0.20; // Hardcoded 20% deposit
+
       // Create order
       return tx.order.create({
         data: {
@@ -116,18 +119,75 @@ export class PrismaPreOrderRepository implements IPreOrderRepository {
           buyerId: userId,
           sellerId: product.sellerId,
           status: "pending_payment",
-          subtotal: product.price * quantity,
-          totalAmount: product.price * quantity,
+          subtotal: totalAmount,
+          totalAmount: totalAmount,
           isDeposit: true,
+          depositAmount: depositAmount,
           items: {
             create: {
               productId: product.id,
               productName: product.name,
               quantity: quantity,
               unitPrice: product.price,
-              subtotal: product.price * quantity,
+              subtotal: totalAmount,
             }
           }
+        }
+      });
+    });
+  }
+
+  async findOrderById(orderId: string): Promise<Order | null> {
+    return prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: { include: { product: true } } }
+    });
+  }
+
+  async getUnpaidReservations(beforeDate: Date): Promise<Order[]> {
+    return prisma.order.findMany({
+      where: {
+        isDeposit: true,
+        status: "pending_payment",
+        createdAt: {
+          lt: beforeDate
+        }
+      },
+      include: { items: true }
+    });
+  }
+
+  async cancelReservation(orderId: string, reason: string): Promise<Order> {
+    return await prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        include: { items: true }
+      });
+
+      if (!order) throw new Error("Order not found");
+      if (order.status === "cancelled") return order;
+
+      // Restore product booked quantity
+      if (order.items && order.items[0]) {
+        const productId = order.items[0].productId;
+        const quantity = order.items[0].quantity;
+        
+        await tx.product.update({
+          where: { id: productId },
+          data: {
+            currentBooked: {
+              decrement: quantity
+            }
+          }
+        });
+      }
+
+      return tx.order.update({
+        where: { id: orderId },
+        data: {
+          status: "cancelled",
+          cancelledReason: reason,
+          cancelledAt: new Date()
         }
       });
     });

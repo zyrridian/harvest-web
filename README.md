@@ -184,3 +184,30 @@ UPDATE "User" SET "userType" = 'ADMIN' WHERE email = 'your@email.com';
 - [Next.js Documentation](https://nextjs.org/docs)
 - [Prisma Documentation](https://www.prisma.io/docs)
 - [Vercel Documentation](https://vercel.com/docs)
+
+## Harvest Schedule & Preorders
+
+The Harvest Schedule system allows users to reserve upcoming harvests. It is decoupled from the standard marketplace cart to support its unique payment flow:
+- **Deposit Policy:** Preorders require a 20% deposit. The remaining balance is paid on delivery/pickup.
+- **Cancellation Policy:** Users can cancel a preorder for a full refund up to 7 days before the harvest date.
+
+### Cron Job Setup for VPS (Ubuntu / Digital Ocean)
+
+To automatically cancel reservations that have been unpaid for over 24 hours, you should set up a cron job on your VPS to periodically hit the cron endpoint.
+
+1. SSH into your VPS:
+```bash
+ssh root@your_droplet_ip
+```
+
+2. Open the crontab editor:
+```bash
+crontab -e
+```
+
+3. Add the following line to run the job every hour (adjust the URL to your actual production domain):
+```bash
+0 * * * * curl -X POST https://your-domain.com/api/v1/cron/cancel-unpaid-preorders
+```
+
+*(Optional: If you add an authorization header check in the route later, include it in the curl command: `curl -H "Authorization: Bearer YOUR_SECRET" -X POST ...`)*

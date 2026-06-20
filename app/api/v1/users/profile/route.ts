@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/core/database/prisma";
-import { verifyToken, extractBearerToken } from "@/features/auth";
+import { verifyAuth } from "@/features/auth";
+import { handleRouteError } from "@/core/errors";
+import { successResponse } from "@/core/helpers/response";
+import {
+  GetProfileUseCase,
+  UpdateProfileUseCase,
+  userProfileRepository,
+  UpdateProfileSchema,
+} from "@/features/users";
 
 /**
  * @swagger
@@ -50,76 +57,17 @@ import { verifyToken, extractBearerToken } from "@/features/auth";
  */
 export async function GET(request: NextRequest) {
   try {
-    // Get token from Authorization header
-    const authHeader = request.headers.get("Authorization");
-    const token = extractBearerToken(authHeader);
+    const user = await verifyAuth(request);
 
-    if (!token) {
-      return NextResponse.json(
-        { status: "error", message: "No token provided" },
-        { status: 401 },
-      );
-    }
+    const useCase = new GetProfileUseCase(userProfileRepository);
+    const profileData = await useCase.execute(user.userId);
 
-    // Verify token
-    const payload = await verifyToken(token);
-
-    if (!payload || payload.type !== "access") {
-      return NextResponse.json(
-        { status: "error", message: "Invalid token" },
-        { status: 401 },
-      );
-    }
-
-    // Get user with profile
-    const user = await prisma.user.findUnique({
-      where: { id: payload.userId },
-      include: { profile: true },
-    });
-
-    if (!user) {
-      return NextResponse.json(
-        { status: "error", message: "User not found" },
-        { status: 404 },
-      );
-    }
-
-    // Prepare response (exclude password)
-    const userResponse = {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      phone_number: user.phoneNumber,
-      avatar_url: user.avatarUrl,
-      user_type: user.userType,
-      is_verified: user.isVerified,
-      created_at: user.createdAt.toISOString(),
-      updated_at: user.updatedAt.toISOString(),
-    };
-
-    const profileResponse = user.profile
-      ? {
-          bio: user.profile.bio,
-          followers_count: user.profile.followersCount,
-          response_rate: user.profile.responseRate,
-          response_time: user.profile.responseTime,
-          joined_since: user.profile.joinedSince.toISOString(),
-        }
-      : null;
-
-    return NextResponse.json({
-      status: "success",
-      data: {
-        user: userResponse,
-        profile: profileResponse,
-      },
-    });
+    // Using NextResponse.json manually here to match the exact documented response shape
+    // Or we could rely on successResponse if it handles it. 
+    // The previous implementation had data: { user: {...}, profile: {...} }
+    return successResponse(profileData);
   } catch (error) {
-    console.error("Get profile error:", error);
-    return NextResponse.json(
-      { status: "error", message: "Internal server error" },
-      { status: 500 },
-    );
+    return handleRouteError(error, "Get profile");
   }
 }
 
@@ -174,97 +122,22 @@ export async function GET(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    // Get token from Authorization header
-    const authHeader = request.headers.get("Authorization");
-    const token = extractBearerToken(authHeader);
-
-    if (!token) {
-      return NextResponse.json(
-        { status: "error", message: "No token provided" },
-        { status: 401 },
-      );
-    }
-
-    // Verify token
-    const payload = await verifyToken(token);
-
-    if (!payload || payload.type !== "access") {
-      return NextResponse.json(
-        { status: "error", message: "Invalid token" },
-        { status: 401 },
-      );
-    }
-
+    const user = await verifyAuth(request);
     const body = await request.json();
-    const { name, phone_number, bio } = body;
 
-    // Update user basic info
-    const updateData: {
-      name?: string;
-      phoneNumber?: string;
-    } = {};
+    const input = UpdateProfileSchema.parse(body);
 
-    if (name) updateData.name = name;
-    if (phone_number !== undefined) updateData.phoneNumber = phone_number;
-
-    const user = await prisma.user.update({
-      where: { id: payload.userId },
-      data: updateData,
+    const useCase = new UpdateProfileUseCase(userProfileRepository);
+    const profileData = await useCase.execute(user.userId, {
+      name: input.name,
+      phoneNumber: input.phone_number,
+      bio: input.bio,
     });
 
-    // Update or create profile
-    if (bio !== undefined) {
-      await prisma.userProfile.upsert({
-        where: { userId: payload.userId },
-        update: { bio },
-        create: {
-          userId: payload.userId,
-          bio,
-        },
-      });
-    }
-
-    // Fetch updated user with profile
-    const updatedUser = await prisma.user.findUnique({
-      where: { id: payload.userId },
-      include: { profile: true },
-    });
-
-    const userResponse = {
-      id: updatedUser!.id,
-      email: updatedUser!.email,
-      name: updatedUser!.name,
-      phone_number: updatedUser!.phoneNumber,
-      avatar_url: updatedUser!.avatarUrl,
-      user_type: updatedUser!.userType,
-      is_verified: updatedUser!.isVerified,
-      created_at: updatedUser!.createdAt.toISOString(),
-      updated_at: updatedUser!.updatedAt.toISOString(),
-    };
-
-    const profileResponse = updatedUser!.profile
-      ? {
-          bio: updatedUser!.profile.bio,
-          followers_count: updatedUser!.profile.followersCount,
-          response_rate: updatedUser!.profile.responseRate,
-          response_time: updatedUser!.profile.responseTime,
-          joined_since: updatedUser!.profile.joinedSince.toISOString(),
-        }
-      : null;
-
-    return NextResponse.json({
-      status: "success",
+    return successResponse(profileData, {
       message: "Profile updated successfully",
-      data: {
-        user: userResponse,
-        profile: profileResponse,
-      },
     });
   } catch (error) {
-    console.error("Update profile error:", error);
-    return NextResponse.json(
-      { status: "error", message: "Internal server error" },
-      { status: 500 },
-    );
+    return handleRouteError(error, "Update profile");
   }
 }

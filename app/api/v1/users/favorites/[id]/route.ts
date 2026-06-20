@@ -10,7 +10,7 @@ import { RemoveFavoriteByIdUseCase } from "@/features/products/application/useca
  * /api/v1/users/favorites/{id}:
  *   delete:
  *     summary: Remove a favorite
- *     tags: [Users]
+ *     tags: [User Profile]
  *     security:
  *       - bearerAuth: []
  *     parameters:

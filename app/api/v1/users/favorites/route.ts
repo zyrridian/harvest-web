@@ -10,7 +10,7 @@ import { GetUserFavoritesUseCase } from "@/features/products/application/usecase
  * /api/v1/users/favorites:
  *   get:
  *     summary: Get user's favorite products
- *     tags: [Users]
+ *     tags: [User Profile]
  *     security:
  *       - bearerAuth: []
  *     responses:

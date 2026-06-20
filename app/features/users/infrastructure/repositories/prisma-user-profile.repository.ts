@@ -47,6 +47,15 @@ export class PrismaUserProfileRepository implements IUserProfileRepository {
 
     return updatedUser as unknown as UserWithProfileEntity;
   }
+
+  async updateAvatar(userId: string, avatarUrl: string): Promise<{ avatarUrl: string | null }> {
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: { avatarUrl },
+      select: { avatarUrl: true },
+    });
+    return user;
+  }
 }
 
 export const userProfileRepository = new PrismaUserProfileRepository();

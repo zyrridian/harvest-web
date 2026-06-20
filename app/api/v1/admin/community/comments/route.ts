@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/core/database/prisma";
 import { verifyAdmin } from "@/features/auth";
+import {
+  GetAdminCommentsUseCase,
+  communityRepository,
+  AdminCommunityPaginationSchema,
+} from "@/features/community";
+import { handleRouteError } from "@/core/errors";
 
 /**
  * @swagger
@@ -38,62 +43,24 @@ export async function GET(request: NextRequest) {
     await verifyAdmin(request);
 
     const { searchParams } = new URL(request.url);
-    const search = searchParams.get("search");
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "20");
-    const skip = (page - 1) * limit;
+    
+    // Convert searchParams to an object to validate with Zod
+    const queryData = {
+      search: searchParams.get("search") || undefined,
+      page: searchParams.get("page") || undefined,
+      limit: searchParams.get("limit") || undefined,
+    };
 
-    const where: any = {};
+    const input = AdminCommunityPaginationSchema.parse(queryData);
 
-    if (search) {
-      where.content = { contains: search, mode: "insensitive" };
-    }
-
-    const [comments, total] = await Promise.all([
-      prisma.postComment.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { createdAt: "desc" },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-          post: {
-            select: {
-              id: true,
-              title: true,
-            },
-          },
-        },
-      }),
-      prisma.postComment.count({ where }),
-    ]);
+    const useCase = new GetAdminCommentsUseCase(communityRepository);
+    const result = await useCase.execute(input);
 
     return NextResponse.json({
       status: "success",
-      data: {
-        comments,
-        pagination: {
-          page,
-          limit,
-          total,
-          total_pages: Math.ceil(total / limit),
-        },
-      },
+      data: result,
     });
-  } catch (error: any) {
-    console.error("Get comments error:", error);
-    return NextResponse.json(
-      {
-        status: "error",
-        message: error.message || "Failed to get comments",
-      },
-      { status: error.status || 500 },
-    );
+  } catch (error) {
+    return handleRouteError(error, "Get admin comments");
   }
 }

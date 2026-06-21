@@ -81,7 +81,7 @@ export class PrismaFarmerRepository implements IFarmerRepository {
         continue; // Skip if looking for open now and they are not open
       }
 
-      if (farmer.latitude && farmer.longitude) {
+      if (farmer.latitude != null && farmer.longitude != null) {
         const distance = this.calculateDistance(lat, lng, farmer.latitude, farmer.longitude);
         if (distance <= radius) {
           (farmer as any).distance = distance;

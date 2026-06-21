@@ -27,18 +27,21 @@ export class GetHarvestScheduleDashboardUseCase {
       }
 
       let statusText = "Upcoming";
-      if (isToday) statusText = "Now";
+      if (order.status === "completed") statusText = "Completed";
+      else if (isToday) statusText = "Now";
       else if (harvestDate < now) statusText = "Ready";
 
       const badges = [];
-      if (order.status === "confirmed" || order.paymentStatus === "paid") badges.push("Pre-ordered");
-      if (isToday) badges.push("Ready today");
-      else if (harvestDate <= now) badges.push("Ready to pick");
+      if (order.status === "completed") badges.push("Completed");
+      else if (order.status === "confirmed" || order.paymentStatus === "paid") badges.push("Pre-ordered");
+      
+      if (isToday && order.status !== "completed") badges.push("Ready today");
+      else if (harvestDate <= now && order.status !== "completed") badges.push("Ready to pick");
       
       if (order.status === "pending_payment") badges.push("Pending confirmation");
       
       const oneDay = 24 * 60 * 60 * 1000;
-      if (order.createdAt && (now.getTime() - order.createdAt.getTime()) < oneDay) {
+      if (order.createdAt && (now.getTime() - order.createdAt.getTime()) < oneDay && order.status !== "completed") {
         badges.push("Just reserved");
       }
 
@@ -50,9 +53,14 @@ export class GetHarvestScheduleDashboardUseCase {
       if (order.status === "pickup_arranged") {
         action2 = "Pickup\\nArranged";
       }
+      if (order.status === "completed") {
+        action1 = "";
+        action2 = "Completed";
+      }
 
+      const depositToPay = order.depositAmount || (order.totalAmount * 0.2);
       const descText = `${item?.quantity || 0} ${product?.unit || ""} reserved · ` + 
-        (order.paymentStatus === "paid" ? `paid Rp ${order.totalAmount} deposit` : `Rp ${order.totalAmount} to pay`);
+        (order.paymentStatus === "paid" ? `paid Rp ${depositToPay} deposit` : `Rp ${depositToPay} deposit to pay`);
 
       const dateGroup = isToday ? `TODAY — ${this.formatShortDate(harvestDate)}` : this.formatShortDate(harvestDate);
 

@@ -25,4 +25,7 @@ export interface IPreOrderRepository {
   getActiveHarvestsCount(): Promise<number>;
   createReservation(userId: string, harvestId: string, quantity: number): Promise<Order>;
   findHarvestById(harvestId: string): Promise<Product | null>;
+  findOrderById(orderId: string): Promise<Order | null>;
+  cancelReservation(orderId: string, reason: string): Promise<Order>;
+  getUnpaidReservations(beforeDate: Date): Promise<Order[]>;
 }

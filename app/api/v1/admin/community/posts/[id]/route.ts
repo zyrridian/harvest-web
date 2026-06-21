@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/core/database/prisma";
 import { verifyAdmin } from "@/features/auth";
+import {
+  DeleteAdminPostUseCase,
+  communityRepository,
+} from "@/features/community";
+import { handleRouteError } from "@/core/errors";
 
 /**
  * @swagger
@@ -34,36 +38,14 @@ export async function DELETE(
     const { id } = await params;
     await verifyAdmin(request);
 
-    const post = await prisma.communityPost.findUnique({
-      where: { id },
-    });
-
-    if (!post) {
-      return NextResponse.json(
-        {
-          status: "error",
-          message: "Post not found",
-        },
-        { status: 404 },
-      );
-    }
-
-    await prisma.communityPost.delete({
-      where: { id },
-    });
+    const useCase = new DeleteAdminPostUseCase(communityRepository);
+    await useCase.execute(id);
 
     return NextResponse.json({
       status: "success",
       message: "Post deleted successfully",
     });
-  } catch (error: any) {
-    console.error("Delete post error:", error);
-    return NextResponse.json(
-      {
-        status: "error",
-        message: error.message || "Failed to delete post",
-      },
-      { status: error.status || 500 },
-    );
+  } catch (error) {
+    return handleRouteError(error, "Delete admin post");
   }
 }

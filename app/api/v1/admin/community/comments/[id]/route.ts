@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/core/database/prisma";
 import { verifyAdmin } from "@/features/auth";
+import {
+  DeleteAdminCommentUseCase,
+  communityRepository,
+} from "@/features/community";
+import { handleRouteError } from "@/core/errors";
 
 /**
  * @swagger
@@ -34,46 +38,14 @@ export async function DELETE(
     const { id } = await params;
     await verifyAdmin(request);
 
-    const comment = await prisma.postComment.findUnique({
-      where: { id },
-    });
-
-    if (!comment) {
-      return NextResponse.json(
-        {
-          status: "error",
-          message: "Comment not found",
-        },
-        { status: 404 },
-      );
-    }
-
-    await prisma.$transaction([
-      prisma.postComment.delete({
-        where: { id },
-      }),
-      prisma.communityPost.update({
-        where: { id: comment.postId },
-        data: {
-          commentsCount: {
-            decrement: 1,
-          },
-        },
-      }),
-    ]);
+    const useCase = new DeleteAdminCommentUseCase(communityRepository);
+    await useCase.execute(id);
 
     return NextResponse.json({
       status: "success",
       message: "Comment deleted successfully",
     });
-  } catch (error: any) {
-    console.error("Delete comment error:", error);
-    return NextResponse.json(
-      {
-        status: "error",
-        message: error.message || "Failed to delete comment",
-      },
-      { status: error.status || 500 },
-    );
+  } catch (error) {
+    return handleRouteError(error, "Delete admin comment");
   }
 }

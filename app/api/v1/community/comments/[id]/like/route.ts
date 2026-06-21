@@ -1,18 +1,13 @@
 import { NextRequest } from "next/server";
-import prisma from "@/core/database/prisma";
 import { verifyAuth } from "@/features/auth";
-import { AppError, handleRouteError } from "@/core/errors";
+import { handleRouteError } from "@/core/errors";
 import { successResponse } from "@/core/helpers/response";
+import {
+  LikeCommentUseCase,
+  UnlikeCommentUseCase,
+  communityRepository,
+} from "@/features/community";
 
-/**
- * @swagger
- * /api/v1/community/comments/{id}/like:
- *   post:
- *     summary: Like a comment
- *     tags: [Community]
- *     security:
- *       - bearerAuth: []
- */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -21,24 +16,8 @@ export async function POST(
     const { id } = await params;
     const user = await verifyAuth(request);
 
-    const comment = await prisma.postComment.findUnique({ where: { id } });
-    if (!comment) throw AppError.notFound("Comment not found");
-
-    const existingLike = await prisma.commentLike.findUnique({
-      where: { commentId_userId: { commentId: id, userId: user.userId } },
-    });
-    if (existingLike)
-      throw AppError.badRequest("You have already liked this comment");
-
-    await prisma.$transaction([
-      prisma.commentLike.create({
-        data: { commentId: id, userId: user.userId },
-      }),
-      prisma.postComment.update({
-        where: { id },
-        data: { likesCount: { increment: 1 } },
-      }),
-    ]);
+    const useCase = new LikeCommentUseCase(communityRepository);
+    await useCase.execute(id, user.userId);
 
     return successResponse(undefined, {
       message: "Comment liked successfully",
@@ -48,15 +27,6 @@ export async function POST(
   }
 }
 
-/**
- * @swagger
- * /api/v1/community/comments/{id}/like:
- *   delete:
- *     summary: Unlike a comment
- *     tags: [Community]
- *     security:
- *       - bearerAuth: []
- */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -65,24 +35,8 @@ export async function DELETE(
     const { id } = await params;
     const user = await verifyAuth(request);
 
-    const comment = await prisma.postComment.findUnique({ where: { id } });
-    if (!comment) throw AppError.notFound("Comment not found");
-
-    const existingLike = await prisma.commentLike.findUnique({
-      where: { commentId_userId: { commentId: id, userId: user.userId } },
-    });
-    if (!existingLike)
-      throw AppError.badRequest("You have not liked this comment");
-
-    await prisma.$transaction([
-      prisma.commentLike.delete({
-        where: { commentId_userId: { commentId: id, userId: user.userId } },
-      }),
-      prisma.postComment.update({
-        where: { id },
-        data: { likesCount: { decrement: 1 } },
-      }),
-    ]);
+    const useCase = new UnlikeCommentUseCase(communityRepository);
+    await useCase.execute(id, user.userId);
 
     return successResponse(undefined, {
       message: "Comment unliked successfully",

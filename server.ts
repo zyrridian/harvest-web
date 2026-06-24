@@ -16,6 +16,32 @@ const handle = app.getRequestHandler();
 // Track online users: userId -> Set of socket IDs
 const onlineUsers = new Map<string, Set<string>>();
 
+async function getUserConversationStats(userId: string) {
+  try {
+    const rawStats = await prisma.$queryRaw`
+      SELECT 
+        COUNT(DISTINCT m.conversation_id) as unread_conversations,
+        COUNT(m.id) as total_unread_messages
+      FROM messages m
+      JOIN conversations c ON m.conversation_id = c.id
+      WHERE m.is_read = false 
+        AND m.sender_id != ${userId}
+        AND (
+          (c.participant_1_id = ${userId} AND m.deleted_for_recipient = false) OR
+          (c.participant_2_id = ${userId} AND m.deleted_for_sender = false)
+        )
+    ` as any[];
+    
+    return {
+      unread_conversations: Number(rawStats?.[0]?.unread_conversations || 0),
+      total_unread_messages: Number(rawStats?.[0]?.total_unread_messages || 0)
+    };
+  } catch (error) {
+    console.error("[Socket] Failed to get stats:", error);
+    return null;
+  }
+}
+
 app.prepare().then(() => {
   const httpServer = createServer(async (req, res) => {
     try {
@@ -184,6 +210,16 @@ app.prepare().then(() => {
             conversation_id,
             last_message: messagePayload,
           });
+
+          const stats = await getUserConversationStats(recipientId);
+          if (stats) {
+            const userSocketIds = onlineUsers.get(recipientId);
+            if (userSocketIds) {
+              for (const socketId of userSocketIds) {
+                io.to(socketId).emit("conversations:stats", stats);
+              }
+            }
+          }
         }
       } catch (err) {
         console.error("[Socket] message:send error:", err);
@@ -218,6 +254,16 @@ app.prepare().then(() => {
           conversation_id,
           reader_id: userId,
         });
+
+        const stats = await getUserConversationStats(userId);
+        if (stats) {
+          const userSocketIds = onlineUsers.get(userId);
+          if (userSocketIds) {
+            for (const socketId of userSocketIds) {
+              io.to(socketId).emit("conversations:stats", stats);
+            }
+          }
+        }
       } catch (err) {
         console.error("[Socket] message:read error:", err);
       }

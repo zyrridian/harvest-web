@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get conversations
-    const [conversations, total] = await Promise.all([
+    const [conversations, total, rawStats] = await Promise.all([
       prisma.conversation.findMany({
         where,
         skip,
@@ -129,7 +129,25 @@ export async function GET(request: NextRequest) {
         },
       }),
       prisma.conversation.count({ where }),
+      prisma.$queryRaw`
+        SELECT 
+          COUNT(DISTINCT m.conversation_id) as unread_conversations,
+          COUNT(m.id) as total_unread_messages
+        FROM messages m
+        JOIN conversations c ON m.conversation_id = c.id
+        WHERE m.is_read = false 
+          AND m.sender_id != ${payload.userId}
+          AND (
+            (c.participant_1_id = ${payload.userId} AND m.deleted_for_recipient = false) OR
+            (c.participant_2_id = ${payload.userId} AND m.deleted_for_sender = false)
+          )
+      ` as Promise<any[]>,
     ]);
+
+    const stats = {
+      unread_conversations: Number(rawStats?.[0]?.unread_conversations || 0),
+      total_unread_messages: Number(rawStats?.[0]?.total_unread_messages || 0)
+    };
 
     // Format response
     const formattedConversations = await Promise.all(
@@ -228,6 +246,7 @@ export async function GET(request: NextRequest) {
           total_pages: Math.ceil(total / limit),
           total_items: total,
         },
+        stats,
       },
     });
   } catch (error) {

@@ -21,7 +21,7 @@ export async function POST(
     if (!farmer) throw AppError.notFound("Farmer profile not found");
 
     const route = await prisma.deliveryRoute.findFirst({
-      where: { id: id, farmerId: farmer.id, status: "active" },
+      where: { id: id, farmerId: farmer.id, status: "in_progress" },
     });
     if (!route) throw AppError.notFound("Active route not found");
 

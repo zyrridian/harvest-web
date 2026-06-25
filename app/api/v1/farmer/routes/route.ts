@@ -17,17 +17,7 @@ interface Coord {
   lng: number;
 }
 
-function haversineKm(a: Coord, b: Coord): number {
-  const R = 6371;
-  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
-  const dLon = ((b.lng - a.lng) * Math.PI) / 180;
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((a.lat * Math.PI) / 180) *
-      Math.cos((b.lat * Math.PI) / 180) *
-      Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
-}
+import { haversineKm } from "@/core/helpers/distance";
 
 // Nearest-neighbor TSP fallback (good enough for <20 stops)
 function nearestNeighborOrder(
@@ -166,6 +156,7 @@ export async function GET(request: NextRequest) {
           address_label: s.addressLabel,
           status: s.status,
           estimated_arrival: s.estimatedArrival,
+          requires_manual_navigation: !s.addressLat,
         })),
       })),
     });
@@ -314,6 +305,7 @@ export async function POST(request: NextRequest) {
           address_label: s.addressLabel,
           recipient_name: s.recipientName,
           status: s.status,
+          requires_manual_navigation: !s.addressLat,
         })),
       },
       { message: "Route created and optimized", status: 201 },

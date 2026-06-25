@@ -262,6 +262,16 @@ export async function POST(request: NextRequest) {
 
     // Create route in DB
     const delivDate = new Date(delivery_date);
+
+    // Support "Regenerate" by removing any existing draft routes for this date
+    await prisma.deliveryRoute.deleteMany({
+      where: {
+        farmerId: farmer.id,
+        deliveryDate: delivDate,
+        status: "draft",
+      },
+    });
+
     const route = await prisma.deliveryRoute.create({
       data: {
         farmerId: farmer.id,

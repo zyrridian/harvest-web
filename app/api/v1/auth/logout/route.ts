@@ -13,7 +13,7 @@ import { authRepository } from "@/features/auth/infrastructure/repositories/pris
  *     summary: Logout current user session
  *     description: Invalidate the current refresh token and end the session
  *     tags:
- *       - Authentication
+ *       - Auth
  *     security:
  *       - BearerAuth: []
  *     responses:

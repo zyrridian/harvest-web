@@ -1,195 +1,190 @@
-import { IPreOrderRepository, HarvestProduct, ReservationOrder } from "../../domain/repositories/preorder.repository";
+import { IPreOrderRepository, CampaignWithFarmer, ReservationWithCampaign } from "../../domain/repositories/preorder.repository";
 import prisma from "@/core/database/prisma";
-import { Product, Order } from "@/generated/prisma/client";
+import { PreorderCampaign, PreorderReservation } from "@/generated/prisma/client";
 
 export class PrismaPreOrderRepository implements IPreOrderRepository {
-  async getAvailableHarvests(latitude?: number, longitude?: number): Promise<HarvestProduct[]> {
-    let harvests = await prisma.product.findMany({
+  
+  // ============================================
+  // CONSUMER SIDE
+  // ============================================
+
+  async getAvailableCampaigns(latitude?: number, longitude?: number): Promise<CampaignWithFarmer[]> {
+    let campaigns = await prisma.preorderCampaign.findMany({
       where: {
-        isAvailable: true,
-        isHarvest: true,
-        harvestDate: {
+        status: "ACTIVE",
+        estimatedHarvestDate: {
           gt: new Date()
         }
       },
       include: {
-        seller: {
-          include: { farmer: true }
-        },
-        images: true
+        farmer: true
       },
       orderBy: {
-        harvestDate: 'asc'
+        estimatedHarvestDate: 'asc'
       }
     });
 
     if (latitude && longitude) {
-      harvests = harvests.map((h) => {
-        if (h.seller.farmer?.latitude && h.seller.farmer?.longitude) {
-          (h as any).distance = this.calculateDistance(
+      campaigns = campaigns.map((c) => {
+        if (c.farmer?.latitude && c.farmer?.longitude) {
+          (c as any).distance = this.calculateDistance(
             latitude,
             longitude,
-            h.seller.farmer.latitude,
-            h.seller.farmer.longitude
+            c.farmer.latitude,
+            c.farmer.longitude
           );
         }
-        return h;
+        return c;
       });
-      // Optionally sort by distance
-      harvests.sort((a: any, b: any) => (a.distance ?? 9999) - (b.distance ?? 9999));
+      campaigns.sort((a: any, b: any) => (a.distance ?? 9999) - (b.distance ?? 9999));
     }
 
-    return harvests as HarvestProduct[];
+    return campaigns as CampaignWithFarmer[];
   }
 
-  async getUserReservations(userId: string): Promise<ReservationOrder[]> {
-    return prisma.order.findMany({
-      where: {
-        buyerId: userId,
-        isDeposit: true, // Reservations act as deposits for harvest
-        status: {
-          in: ["pending_payment", "confirmed", "processing"]
-        }
-      },
+  async getUserReservations(userId: string): Promise<ReservationWithCampaign[]> {
+    return prisma.preorderReservation.findMany({
+      where: { userId },
       include: {
-        items: {
-          include: {
-            product: {
-              include: {
-                seller: {
-                  include: { farmer: true }
-                },
-                images: true
-              }
-            }
-          }
+        campaign: {
+          include: { farmer: true }
         }
       },
       orderBy: {
         createdAt: 'desc'
       }
-    }) as unknown as ReservationOrder[];
+    }) as unknown as ReservationWithCampaign[];
   }
 
-  async getActiveHarvestsCount(): Promise<number> {
-    return prisma.product.count({
-      where: {
-        isAvailable: true,
-        isHarvest: true,
-        harvestDate: {
-          gt: new Date()
-        }
-      }
-    });
-  }
-
-  async findHarvestById(harvestId: string): Promise<Product | null> {
-    return prisma.product.findUnique({
-      where: { id: harvestId }
-    });
-  }
-
-  async createReservation(userId: string, harvestId: string, quantity: number): Promise<Order> {
+  async createReservation(userId: string, campaignId: string, quantity: number, deliveryMethod: string, addressId?: string): Promise<PreorderReservation> {
     return await prisma.$transaction(async (tx) => {
-      const product = await tx.product.findUnique({
-        where: { id: harvestId }
+      const campaign = await tx.preorderCampaign.findUnique({
+        where: { id: campaignId }
       });
 
-      if (!product || !product.isHarvest) {
-        throw new Error("Invalid harvest product");
+      if (!campaign || campaign.status !== "ACTIVE") {
+        throw new Error("Campaign is not available for reservation");
+      }
+
+      if (campaign.currentBookedQuantity + quantity > campaign.targetQuantity) {
+        throw new Error("Not enough target quantity remaining");
       }
 
       // Update booked quantity
-      const newBooked = product.currentBooked + quantity;
-      
-      await tx.product.update({
-        where: { id: harvestId },
-        data: { currentBooked: newBooked }
-      });
-
-      const orderNumber = `RES-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-
-      const totalAmount = product.price * quantity;
-      const depositAmount = totalAmount * 0.20; // Hardcoded 20% deposit
-
-      // Create order
-      return tx.order.create({
-        data: {
-          orderNumber,
-          buyerId: userId,
-          sellerId: product.sellerId,
-          status: "pending_payment",
-          subtotal: totalAmount,
-          totalAmount: totalAmount,
-          isDeposit: true,
-          depositAmount: depositAmount,
-          items: {
-            create: {
-              productId: product.id,
-              productName: product.name,
-              quantity: quantity,
-              unitPrice: product.price,
-              subtotal: totalAmount,
-            }
-          }
-        }
-      });
-    });
-  }
-
-  async findOrderById(orderId: string): Promise<Order | null> {
-    return prisma.order.findUnique({
-      where: { id: orderId },
-      include: { items: { include: { product: true } } }
-    });
-  }
-
-  async getUnpaidReservations(beforeDate: Date): Promise<Order[]> {
-    return prisma.order.findMany({
-      where: {
-        isDeposit: true,
-        status: "pending_payment",
-        createdAt: {
-          lt: beforeDate
-        }
-      },
-      include: { items: true }
-    });
-  }
-
-  async cancelReservation(orderId: string, reason: string): Promise<Order> {
-    return await prisma.$transaction(async (tx) => {
-      const order = await tx.order.findUnique({
-        where: { id: orderId },
-        include: { items: true }
-      });
-
-      if (!order) throw new Error("Order not found");
-      if (order.status === "cancelled") return order;
-
-      // Restore product booked quantity
-      if (order.items && order.items[0]) {
-        const productId = order.items[0].productId;
-        const quantity = order.items[0].quantity;
-        
-        await tx.product.update({
-          where: { id: productId },
-          data: {
-            currentBooked: {
-              decrement: quantity
-            }
-          }
-        });
+      const newBooked = campaign.currentBookedQuantity + quantity;
+      let newStatus = campaign.status;
+      if (newBooked >= campaign.targetQuantity) {
+        newStatus = "FULLY_BOOKED";
       }
-
-      return tx.order.update({
-        where: { id: orderId },
-        data: {
-          status: "cancelled",
-          cancelledReason: reason,
-          cancelledAt: new Date()
+      
+      await tx.preorderCampaign.update({
+        where: { id: campaignId },
+        data: { 
+          currentBookedQuantity: newBooked,
+          status: newStatus
         }
       });
+
+      const totalPrice = campaign.pricePerUnit * quantity;
+      const depositAmount = (totalPrice * campaign.depositPercentage) / 100;
+
+      // Create reservation
+      return tx.preorderReservation.create({
+        data: {
+          campaignId,
+          userId,
+          quantity,
+          totalPrice,
+          depositAmount,
+          status: depositAmount > 0 ? "PENDING_DEPOSIT" : "FULLY_PAID", // simple logic
+          deliveryMethod,
+          addressId
+        }
+      });
+    });
+  }
+
+  async findCampaignById(campaignId: string): Promise<PreorderCampaign | null> {
+    return prisma.preorderCampaign.findUnique({
+      where: { id: campaignId },
+      include: { farmer: true }
+    });
+  }
+
+  async findReservationById(reservationId: string): Promise<PreorderReservation | null> {
+    return prisma.preorderReservation.findUnique({
+      where: { id: reservationId },
+      include: { campaign: true }
+    });
+  }
+
+  async cancelReservation(reservationId: string, reason?: string): Promise<PreorderReservation> {
+    return await prisma.$transaction(async (tx) => {
+      const reservation = await tx.preorderReservation.findUnique({
+        where: { id: reservationId }
+      });
+
+      if (!reservation) throw new Error("Reservation not found");
+      if (reservation.status === "CANCELLED") return reservation;
+
+      // Restore campaign booked quantity
+      await tx.preorderCampaign.update({
+        where: { id: reservation.campaignId },
+        data: {
+          currentBookedQuantity: {
+            decrement: reservation.quantity
+          },
+          status: "ACTIVE" // If it was fully booked, it might be active again
+        }
+      });
+
+      return tx.preorderReservation.update({
+        where: { id: reservationId },
+        data: {
+          status: "CANCELLED"
+        }
+      });
+    });
+  }
+
+  async updateReservationStatus(reservationId: string, status: string, paymentMethod?: string): Promise<PreorderReservation> {
+    const data: any = { status };
+    if (paymentMethod) data.paymentMethod = paymentMethod;
+
+    return prisma.preorderReservation.update({
+      where: { id: reservationId },
+      data
+    });
+  }
+
+  // ============================================
+  // FARMER SIDE
+  // ============================================
+
+  async createCampaign(farmerId: string, data: Partial<PreorderCampaign>): Promise<PreorderCampaign> {
+    return prisma.preorderCampaign.create({
+      data: {
+        ...data,
+        farmerId,
+        status: data.status || "DRAFT"
+      } as any
+    });
+  }
+
+  async updateCampaignStatus(campaignId: string, status: string): Promise<PreorderCampaign> {
+    return prisma.preorderCampaign.update({
+      where: { id: campaignId },
+      data: { status }
+    });
+  }
+
+  async getFarmerCampaigns(farmerId: string): Promise<PreorderCampaign[]> {
+    return prisma.preorderCampaign.findMany({
+      where: { farmerId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        reservations: true
+      }
     });
   }
 

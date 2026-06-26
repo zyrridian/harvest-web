@@ -58,6 +58,7 @@ model User {
   commentLikes         CommentLike[]
   commentReplyTo       PostComment[]         @relation("CommentReplyTo")
   recipes              Recipe[]
+  preorderReservations PreorderReservation[]
 
   @@index([email])
   @@index([userType])
@@ -362,6 +363,7 @@ model Farmer {
   deliverySettings  FarmerDeliverySettings?
   routes            DeliveryRoute[]
   dropPoints        DropPoint[]
+  preorderCampaigns PreorderCampaign[]
 
   @@index([userId])
   @@index([latitude, longitude])
@@ -1140,4 +1142,56 @@ model RecipeIngredient {
   @@index([recipeId])
   @@index([productId])
   @@map("recipe_ingredients")
+}
+
+// ============================================
+// PREORDERS & HARVEST SCHEDULES
+// ============================================
+
+model PreorderCampaign {
+  id                    String   @id @default(uuid())
+  farmerId              String   @map("farmer_id")
+  title                 String
+  description           String?  @db.Text
+  unit                  String   // e.g., "kg", "box"
+  pricePerUnit          Float    @map("price_per_unit")
+  minimumOrderQuantity  Int      @default(1) @map("min_order_qty")
+  targetQuantity        Float    @map("target_quantity")
+  currentBookedQuantity Float    @default(0) @map("current_booked_qty")
+  depositPercentage     Float    @default(0) @map("deposit_percentage") // 0 to 100
+  estimatedHarvestDate  DateTime @map("estimated_harvest_date")
+  status                String   @default("DRAFT") // DRAFT, ACTIVE, FULLY_BOOKED, HARVESTING, COMPLETED, CANCELLED
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  farmer       Farmer                @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  reservations PreorderReservation[]
+  
+  @@index([farmerId])
+  @@index([status])
+  @@map("preorder_campaigns")
+}
+
+model PreorderReservation {
+  id              String   @id @default(uuid())
+  campaignId      String   @map("campaign_id")
+  userId          String   @map("user_id")
+  quantity        Float
+  totalPrice      Float    @map("total_price")
+  depositAmount   Float    @map("deposit_amount")
+  status          String   @default("PENDING_DEPOSIT") // PENDING_DEPOSIT, DEPOSIT_PAID, FULLY_PAID, COMPLETED, CANCELLED
+  paymentMethod   String?  @map("payment_method")
+  deliveryMethod  String?  @map("delivery_method") // PICKUP, DELIVERY
+  addressId       String?  @map("address_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  campaign PreorderCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@index([userId])
+  @@map("preorder_reservations")
 }

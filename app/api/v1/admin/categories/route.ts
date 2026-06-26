@@ -7,7 +7,7 @@ import { verifyAdmin } from "@/features/auth";
  * /api/v1/admin/categories:
  *   get:
  *     summary: Get all categories (including inactive)
- *     tags: [Admin - Categories]
+ *     tags: [Admin]
  *     security:
  *       - BearerAuth: []
  *     parameters:
@@ -26,7 +26,7 @@ import { verifyAdmin } from "@/features/auth";
  *         description: Forbidden - Admin access required
  *   post:
  *     summary: Create a new category
- *     tags: [Admin - Categories]
+ *     tags: [Admin]
  *     security:
  *       - BearerAuth: []
  *     requestBody:

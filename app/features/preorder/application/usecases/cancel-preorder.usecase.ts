@@ -1,50 +1,41 @@
 import { IPreOrderRepository } from "../../domain/repositories/preorder.repository";
-import { AppError } from "@/core/errors";
 
 export class CancelPreOrderUseCase {
   constructor(private readonly preorderRepo: IPreOrderRepository) {}
 
-  async executeUserCancellation(userId: string, orderId: string): Promise<void> {
-    const order = await this.preorderRepo.findOrderById(orderId);
-    if (!order) throw AppError.notFound("Order not found");
-    if (order.buyerId !== userId) throw AppError.forbidden("Not authorized to cancel this order");
-
-    // 7 days before harvest cancellation policy
-    if (order.status !== "pending_payment" && order.status !== "confirmed") {
-      throw AppError.badRequest("Order cannot be cancelled in its current state");
-    }
-
-    const item = (order as any).items?.[0];
-    const harvestDate = item?.product?.harvestDate;
+  async executeUserCancellation(userId: string, reservationId: string, reason?: string) {
+    const reservation = await this.preorderRepo.findReservationById(reservationId);
     
-    if (harvestDate) {
-      const sevenDaysFromNow = new Date();
-      sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
-      if (harvestDate < sevenDaysFromNow) {
-        throw AppError.badRequest("Cannot cancel reservation less than 7 days before harvest");
-      }
+    if (!reservation) {
+      throw new Error("Reservation not found");
     }
 
-    await this.preorderRepo.cancelReservation(orderId, "cancelled_by_user");
+    if (reservation.userId !== userId) {
+      throw new Error("Unauthorized to cancel this reservation");
+    }
+
+    if (reservation.status === "CANCELLED") {
+      throw new Error("Reservation is already cancelled");
+    }
+    
+    // Additional logic can go here (e.g., refunds if deposit was paid)
+
+    const cancelledReservation = await this.preorderRepo.cancelReservation(reservationId, reason);
+
+    return {
+      success: true,
+      reservation_id: cancelledReservation.id,
+      status: cancelledReservation.status
+    };
   }
 
-  async executeCronCancellation(): Promise<{ cancelledCount: number }> {
-    // 24 hours expiration for unpaid reservations
-    const expirationDate = new Date();
-    expirationDate.setHours(expirationDate.getHours() - 24);
-
-    const unpaidOrders = await this.preorderRepo.getUnpaidReservations(expirationDate);
+  async executeCronCancellation(reservationId: string, reason: string = "Payment timeout") {
+    const reservation = await this.preorderRepo.findReservationById(reservationId);
     
-    let cancelledCount = 0;
-    for (const order of unpaidOrders) {
-      try {
-        await this.preorderRepo.cancelReservation(order.id, "auto_cancelled_unpaid");
-        cancelledCount++;
-      } catch (err) {
-        console.error(`Failed to cancel order ${order.id}:`, err);
-      }
+    if (!reservation || reservation.status === "CANCELLED") {
+      return null;
     }
 
-    return { cancelledCount };
+    return await this.preorderRepo.cancelReservation(reservationId, reason);
   }
 }

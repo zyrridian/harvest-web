@@ -6,25 +6,27 @@ export class ArrangePickupUseCase {
   constructor(private readonly harvestRepo: IHarvestScheduleRepository) {}
 
   async execute(userId: string, input: ArrangePickupInputDTO): Promise<ArrangePickupResponseDTO> {
-    const order = await this.harvestRepo.findOrderById(input.harvest_id);
+    const reservation = await this.harvestRepo.findReservationById(input.harvest_id);
 
-    if (!order) {
+    if (!reservation) {
       throw AppError.notFound("Harvest reservation not found");
     }
 
-    if (order.buyerId !== userId) {
+    if (reservation.userId !== userId) {
       throw AppError.unauthorized("Not authorized to arrange pickup for this reservation");
     }
 
-    if (order.paymentStatus !== "paid") {
+    if (reservation.status !== "DEPOSIT_PAID" && reservation.status !== "FULLY_PAID") {
       throw AppError.badRequest("Cannot arrange pickup before paying deposit");
     }
 
-    const updatedOrder = await this.harvestRepo.updateOrderPickup(order.id, input.pickup_time);
+    // In a real system, you might add a pickup_time field to the schema.
+    // For now, we just change the status if we don't have that field.
+    const updatedReservation = await this.harvestRepo.updateReservationStatus(reservation.id, "PICKUP_ARRANGED");
 
     return {
-      harvest_id: updatedOrder.id,
-      pickup_time: updatedOrder.deliveryTimeSlot || input.pickup_time,
+      harvest_id: updatedReservation.id,
+      pickup_time: input.pickup_time,
       status: "Pickup Arranged"
     };
   }

@@ -33,8 +33,10 @@ export interface PreOrderDashboardResponseDTO {
 }
 
 export const ReservePreOrderSchema = z.object({
-  harvest_id: z.string().uuid(),
+  campaign_id: z.string().uuid(),
   quantity: z.coerce.number().min(1),
+  delivery_method: z.string().default("PICKUP"),
+  address_id: z.string().uuid().optional()
 });
 
 export type ReservePreOrderInputDTO = z.infer<typeof ReservePreOrderSchema>;
@@ -42,4 +44,6 @@ export type ReservePreOrderInputDTO = z.infer<typeof ReservePreOrderSchema>;
 export interface ReservePreOrderResponseDTO {
   reservation_id: string;
   status: string;
+  deposit_amount: number;
+  total_price: number;
 }

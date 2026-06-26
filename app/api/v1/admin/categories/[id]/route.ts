@@ -7,7 +7,7 @@ import { verifyAdmin } from "@/features/auth";
  * /api/v1/admin/categories/{id}:
  *   get:
  *     summary: Get a specific category
- *     tags: [Admin - Categories]
+ *     tags: [Admin]
  *     security:
  *       - BearerAuth: []
  *     parameters:
@@ -23,7 +23,7 @@ import { verifyAdmin } from "@/features/auth";
  *         description: Category not found
  *   patch:
  *     summary: Update a category
- *     tags: [Admin - Categories]
+ *     tags: [Admin]
  *     security:
  *       - BearerAuth: []
  *     parameters:
@@ -63,7 +63,7 @@ import { verifyAdmin } from "@/features/auth";
  *   delete:
  *     summary: Delete a category
  *     description: Deletes a category if it has no products. Otherwise, deactivates it.
- *     tags: [Admin - Categories]
+ *     tags: [Admin]
  *     security:
  *       - BearerAuth: []
  *     parameters:

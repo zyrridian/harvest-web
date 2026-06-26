@@ -6,24 +6,24 @@ export class PayDepositUseCase {
   constructor(private readonly harvestRepo: IHarvestScheduleRepository) {}
 
   async execute(userId: string, input: PayDepositInputDTO): Promise<PayDepositResponseDTO> {
-    const order = await this.harvestRepo.findOrderById(input.harvest_id);
+    const reservation = await this.harvestRepo.findReservationById(input.harvest_id);
 
-    if (!order) {
+    if (!reservation) {
       throw AppError.notFound("Harvest reservation not found");
     }
 
-    if (order.buyerId !== userId) {
+    if (reservation.userId !== userId) {
       throw AppError.unauthorized("Not authorized to pay for this reservation");
     }
 
-    if (order.paymentStatus === "paid" || order.status === "confirmed") {
+    if (reservation.status === "DEPOSIT_PAID" || reservation.status === "FULLY_PAID") {
       throw AppError.badRequest("Deposit already paid for this harvest");
     }
 
-    const updatedOrder = await this.harvestRepo.updateOrderDeposit(order.id);
+    const updatedReservation = await this.harvestRepo.updateReservationStatus(reservation.id, "DEPOSIT_PAID");
 
     return {
-      harvest_id: updatedOrder.id,
+      harvest_id: updatedReservation.id,
       status: "Confirmed"
     };
   }

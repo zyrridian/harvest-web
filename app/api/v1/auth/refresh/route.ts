@@ -12,7 +12,7 @@ import { authRepository } from "@/features/auth/infrastructure/repositories/pris
  *     summary: Refresh access token
  *     description: Get a new access token using a valid refresh token
  *     tags:
- *       - Authentication
+ *       - Auth
  *     requestBody:
  *       required: true
  *       content:

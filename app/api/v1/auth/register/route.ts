@@ -14,7 +14,7 @@ import { authRepository } from "@/features/auth/infrastructure/repositories/pris
  *     summary: Register a new user account
  *     description: Create a new user account with email, password, and name
  *     tags:
- *       - Authentication
+ *       - Auth
  *     requestBody:
  *       required: true
  *       content:

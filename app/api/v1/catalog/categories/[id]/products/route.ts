@@ -1,11 +1,14 @@
 import { NextRequest } from "next/server";
-import prisma from "@/core/database/prisma";
-import { AppError, handleRouteError } from "@/core/errors";
+import { handleRouteError } from "@/core/errors";
 import { successResponse } from "@/core/helpers/response";
 import {
   parsePagination,
-  buildPaginationMeta,
 } from "@/core/helpers/pagination";
+
+import { GetProductsUseCase } from "@/features/catalog/application/usecases/products/get-products.usecase";
+import { GetCategoryDetailsUseCase } from "@/features/catalog/application/usecases/categories/get-category-details.usecase";
+import { productRepository } from "@/features/catalog/infrastructure/repositories/prisma-product.repository";
+import { categoryRepository } from "@/features/catalog/infrastructure/repositories/prisma-category.repository";
 
 /**
  * @swagger
@@ -50,77 +53,16 @@ export async function GET(
     const { page, limit, skip } = parsePagination(searchParams);
     const sortBy = searchParams.get("sort_by") || "newest";
 
-    const category = await prisma.category.findFirst({
-      where: { OR: [{ id }, { slug: id }] },
-    });
+    const getCategory = new GetCategoryDetailsUseCase(categoryRepository);
+    const category = await getCategory.execute(id);
 
-    if (!category) {
-      throw AppError.notFound("Category not found");
-    }
+    const getProducts = new GetProductsUseCase(productRepository);
+    const result = await getProducts.execute(
+      { categoryId: category.id, isAvailable: true },
+      { skip, take: limit, sortBy, order: "desc" }
+    );
 
-    const orderBy: Record<string, string> =
-      sortBy === "price"
-        ? { price: "asc" }
-        : sortBy === "rating"
-          ? { rating: "desc" }
-          : { createdAt: "desc" };
-
-    const [products, totalItems] = await Promise.all([
-      prisma.product.findMany({
-        where: { categoryId: category.id, isAvailable: true },
-        skip,
-        take: limit,
-        orderBy,
-        include: {
-          seller: { select: { id: true, name: true } },
-          images: {
-            where: { isPrimary: true },
-            take: 1,
-            select: { url: true },
-          },
-          discounts: {
-            where: {
-              isActive: true,
-              validFrom: { lte: new Date() },
-              validUntil: { gte: new Date() },
-            },
-            take: 1,
-            orderBy: { value: "desc" },
-          },
-        },
-      }),
-      prisma.product.count({
-        where: { categoryId: category.id, isAvailable: true },
-      }),
-    ]);
-
-    const formattedProducts = products.map((product) => {
-      const primaryImage = product.images[0];
-      const activeDiscount = product.discounts[0];
-      return {
-        id: product.id,
-        name: product.name,
-        category_id: category.id,
-        category_name: category.name,
-        seller_id: product.sellerId,
-        seller_name: product.seller.name,
-        price: product.price,
-        unit: product.unit,
-        image_url: primaryImage?.url || null,
-        rating: product.rating,
-        review_count: product.reviewCount,
-        is_organic: product.isOrganic,
-        stock_quantity: product.stockQuantity,
-        discount: activeDiscount
-          ? `${activeDiscount.value}${activeDiscount.type === "percentage" ? "%" : ""} OFF`
-          : null,
-      };
-    });
-
-    return successResponse({
-      products: formattedProducts,
-      pagination: buildPaginationMeta(page, limit, totalItems),
-    });
+    return successResponse(result);
   } catch (error) {
     return handleRouteError(error, "Fetch category products");
   }

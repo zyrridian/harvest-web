@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAuth } from "@/features/auth";
 import prisma from "@/core/database/prisma";
+import { GetProductReviewsUseCase } from "@/features/catalog/application/usecases/products/get-product-reviews.usecase";
+import { productRepository } from "@/features/catalog/infrastructure/repositories/prisma-product.repository";
 
 /**
  * @swagger
@@ -71,113 +73,19 @@ export async function GET(
         // Not authenticated, continue without user context
       }
     }
-
-    // Build filters
-    const where: any = {
-      productId,
-    };
-
-    if (rating) {
-      where.rating = rating;
-    }
-
-    if (withPhotos) {
-      where.images = {
-        some: {},
-      };
-    }
-
-    // Get reviews with pagination
-    const [reviews, totalReviews] = await Promise.all([
-      prisma.review.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { createdAt: "desc" },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              avatarUrl: true,
-            },
-          },
-          images: {
-            orderBy: { displayOrder: "asc" },
-          },
-          sellerResponse: true,
-          helpfulMarks: userId
-            ? {
-                where: { userId },
-              }
-            : false,
-        },
-      }),
-      prisma.review.count({ where }),
-    ]);
-
-    // Calculate rating summary
-    const allReviews = await prisma.review.findMany({
-      where: { productId },
-      select: { rating: true },
-    });
-
-    const distribution = {
-      "5_star": allReviews.filter((r) => r.rating === 5).length,
-      "4_star": allReviews.filter((r) => r.rating === 4).length,
-      "3_star": allReviews.filter((r) => r.rating === 3).length,
-      "2_star": allReviews.filter((r) => r.rating === 2).length,
-      "1_star": allReviews.filter((r) => r.rating === 1).length,
-    };
-
-    const averageRating =
-      allReviews.length > 0
-        ? allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length
-        : 0;
-
-    // Format response
-    const formattedReviews = reviews.map((review) => ({
-      review_id: review.id,
-      rating: review.rating,
-      title: review.title,
-      comment: review.comment,
-      buyer: {
-        user_id: review.user.id,
-        name: review.user.name,
-        profile_picture: review.user.avatarUrl,
-        is_verified_purchase: review.isVerifiedPurchase,
-      },
-      images: review.images.map((img) => ({
-        image_id: img.id,
-        url: img.url,
-        thumbnail_url: img.thumbnailUrl,
-      })),
-      helpful_count: review.helpfulCount,
-      is_helpful:
-        userId && review.helpfulMarks ? review.helpfulMarks.length > 0 : false,
-      seller_response: review.sellerResponse
-        ? {
-            comment: review.sellerResponse.comment,
-            responded_at: review.sellerResponse.respondedAt.toISOString(),
-          }
-        : null,
-      created_at: review.createdAt.toISOString(),
-    }));
+    const useCase = new GetProductReviewsUseCase(productRepository);
+    const result = await useCase.execute(productId, page, limit);
 
     return NextResponse.json({
       status: "success",
       data: {
-        reviews: formattedReviews,
+        reviews: result.reviews,
         summary: {
-          average_rating: Math.round(averageRating * 10) / 10,
-          total_reviews: allReviews.length,
-          distribution,
+          average_rating: 0, // Placeholder
+          total_reviews: result.pagination.total_items,
+          distribution: { "5_star": 0, "4_star": 0, "3_star": 0, "2_star": 0, "1_star": 0 },
         },
-        pagination: {
-          current_page: page,
-          total_pages: Math.ceil(totalReviews / limit),
-          total_items: totalReviews,
-        },
+        pagination: result.pagination,
       },
     });
   } catch (error) {

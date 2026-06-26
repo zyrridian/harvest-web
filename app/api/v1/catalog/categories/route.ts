@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import prisma from "@/core/database/prisma";
 import { handleRouteError } from "@/core/errors";
 import { successResponse } from "@/core/helpers/response";
+import { GetCategoriesUseCase } from "@/features/catalog/application/usecases/categories/get-categories.usecase";
+import { categoryRepository } from "@/features/catalog/infrastructure/repositories/prisma-category.repository";
 
 /**
  * @swagger
@@ -15,23 +17,8 @@ import { successResponse } from "@/core/helpers/response";
  */
 export async function GET(request: NextRequest) {
   try {
-    const categories = await prisma.category.findMany({
-      where: { isActive: true },
-      orderBy: { displayOrder: "asc" },
-      include: { _count: { select: { products: true } } },
-    });
-
-    const formattedCategories = categories.map((category) => ({
-      id: category.id,
-      name: category.name,
-      slug: category.slug,
-      description: category.description,
-      emoji: category.emoji,
-      gradient_colors: category.gradientColors,
-      product_count: category._count.products,
-      display_order: category.displayOrder,
-      is_active: category.isActive,
-    }));
+    const useCase = new GetCategoriesUseCase(categoryRepository);
+    const formattedCategories = await useCase.execute();
 
     return successResponse(formattedCategories);
   } catch (error) {

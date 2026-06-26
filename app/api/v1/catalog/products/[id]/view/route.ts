@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/core/database/prisma";
 import { verifyToken, extractBearerToken } from "@/features/auth";
+import { RecordProductViewUseCase } from "@/features/catalog/application/usecases/products/record-product-view.usecase";
+import { productRepository } from "@/features/catalog/infrastructure/repositories/prisma-product.repository";
 
 /**
  * @swagger
@@ -41,35 +42,8 @@ export async function POST(
       }
     }
 
-    // Check if product exists
-    const product = await prisma.product.findUnique({
-      where: { id: id },
-    });
-
-    if (!product) {
-      return NextResponse.json(
-        { status: "error", message: "Product not found" },
-        { status: 404 },
-      );
-    }
-
-    // Track view and increment view count
-    await prisma.$transaction([
-      prisma.productView.create({
-        data: {
-          productId: id,
-          userId,
-        },
-      }),
-      prisma.product.update({
-        where: { id: id },
-        data: {
-          viewCount: {
-            increment: 1,
-          },
-        },
-      }),
-    ]);
+    const useCase = new RecordProductViewUseCase(productRepository);
+    await useCase.execute(userId, id);
 
     return NextResponse.json({
       status: "success",

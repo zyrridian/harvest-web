@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAuth } from "@/features/auth";
-import prisma from "@/core/database/prisma";
+import { productRepository } from "@/features/catalog/infrastructure/repositories/prisma-product.repository";
+import { GetProductsUseCase } from "@/features/catalog/application/usecases/products/get-products.usecase";
+import { searchRepository } from "@/features/catalog/infrastructure/repositories/prisma-search.repository";
 
 /**
  * @swagger
@@ -83,126 +85,50 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const useCase = new GetProductsUseCase(productRepository);
+    const result = await useCase.execute(
+      {
+        searchQuery: query.trim(),
+        isAvailable: true,
+        isOrganic: types.includes("organic") ? true : undefined,
+        minPrice,
+        maxPrice,
+      },
+      { skip, take: limit, sortBy, order: sortBy === "price" ? "asc" : "desc" }
+    );
+
     // Save search history if authenticated
     const authHeader = request.headers.get("authorization");
     if (authHeader?.startsWith("Bearer ")) {
       try {
         const payload = await verifyAuth(request);
-        // We'll update result count after the search
-        await prisma.searchHistory.create({
-          data: {
-            userId: payload.userId,
-            query: query.trim(),
-            resultCount: 0, // Will update after counting
-          },
-        });
+        await searchRepository.saveSearchHistory(payload.userId, query.trim(), result.pagination.total_items);
       } catch {
         // Not authenticated or invalid token, continue without saving history
       }
     }
 
-    // Build search filters
-    const where: any = {
-      isAvailable: true,
-      OR: [
-        { name: { contains: query, mode: "insensitive" } },
-        { description: { contains: query, mode: "insensitive" } },
-        { longDescription: { contains: query, mode: "insensitive" } },
-      ],
-    };
-
-    if (minPrice !== undefined || maxPrice !== undefined) {
-      where.price = {};
-      if (minPrice !== undefined) where.price.gte = minPrice;
-      if (maxPrice !== undefined) where.price.lte = maxPrice;
-    }
-
-    if (categories.length > 0) {
-      where.OR = [
-        ...(where.OR || []),
-        { categoryId: { in: categories } },
-        { subcategoryId: { in: categories } },
-      ];
-    }
-
-    if (types.includes("organic")) {
-      where.isOrganic = true;
-    }
-
-    // Build order by
-    let orderBy: any = { createdAt: "desc" }; // default for relevance and newest
-
-    if (sortBy === "price") {
-      orderBy = { price: "asc" };
-    } else if (sortBy === "newest") {
-      orderBy = { createdAt: "desc" };
-    } else if (sortBy === "rating") {
-      // Note: Requires aggregated rating calculation
-      orderBy = { createdAt: "desc" }; // Fallback for now
-    }
-
-    // Execute search
-    const [products, total] = await Promise.all([
-      prisma.product.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy,
-        include: {
-          seller: {
-            select: {
-              id: true,
-              name: true,
-              farmer: {
-                select: {
-                  city: true,
-                },
-              },
-            },
-          },
-          images: {
-            where: { isPrimary: true },
-            take: 1,
-          },
-          category: {
-            select: { name: true },
-          },
-          reviews: {
-            select: { rating: true },
-          },
-        },
-      }),
-      prisma.product.count({ where }),
-    ]);
-
-    // Format results
-    const results = products.map((product) => {
-      const avgRating =
-        product.reviews.length > 0
-          ? product.reviews.reduce((sum, r) => sum + r.rating, 0) /
-            product.reviews.length
-          : 0;
-
+    // Adapt to expected return format
+    const results = result.products.map((product) => {
       return {
         id: product.id,
         name: product.name,
         description: product.description,
-        store_name: product.seller.name,
-        store_id: product.seller.id,
+        store_name: product.seller_name,
+        store_id: product.seller_id,
         distance: null, // Would need location-based calculation
         price: product.price,
         unit: product.unit,
-        rating: Math.round(avgRating * 10) / 10,
-        stock: product.stockQuantity,
-        tag: product.isOrganic ? "Organic" : null,
-        image_url: product.images[0]?.url || null,
-        category: product.category?.name || null,
+        rating: product.rating,
+        stock: product.stock_quantity,
+        tag: product.is_organic ? "Organic" : null,
+        image_url: product.images && product.images.length > 0 ? product.images[0] : null,
+        category: product.category,
         types: [
-          product.isOrganic && "Organic",
-          "Fresh", // Could be based on created date
-          product.seller.farmer?.city && "Local",
+          product.is_organic && "Organic",
+          "Fresh",
         ].filter(Boolean),
-        created_at: product.createdAt.toISOString(),
+        created_at: product.created_at,
       };
     });
 
@@ -210,7 +136,7 @@ export async function GET(request: NextRequest) {
       status: "success",
       data: results,
       meta: {
-        total,
+        total: result.pagination.total_items,
         page,
         limit,
         query: query.trim(),

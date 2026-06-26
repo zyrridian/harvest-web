@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@/generated/prisma/client";
-import { PrismaPg } from "@prisma/adapter-pg";
-import pg from "pg";
-
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-});
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
+import { masterDataRepository } from "@/features/catalog/infrastructure/repositories/prisma-master-data.repository";
+import { GetCitiesUseCase } from "@/features/catalog/application/usecases/master-data/get-master-data.usecases";
 
 /**
  * @swagger
@@ -50,20 +43,8 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const provinceId = searchParams.get("province_id");
 
-    const whereClause = provinceId
-      ? { provinceId: parseInt(provinceId, 10) }
-      : {};
-
-    const cities = await prisma.city.findMany({
-      where: whereClause,
-      orderBy: { name: "asc" },
-    });
-
-    const mappedCities = cities.map((city) => ({
-      id: city.id,
-      province_id: city.provinceId,
-      name: city.name,
-    }));
+    const useCase = new GetCitiesUseCase(masterDataRepository);
+    const mappedCities = await useCase.execute(provinceId ? parseInt(provinceId, 10) : undefined);
 
     return NextResponse.json({
       status: "success",
@@ -75,7 +56,5 @@ export async function GET(request: NextRequest) {
       { status: "error", message: "Failed to fetch cities" },
       { status: 500 }
     );
-  } finally {
-    await prisma.$disconnect();
   }
 }

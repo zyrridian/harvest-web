@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/core/database/prisma";
+import { farmerRepository } from "@/features/catalog/infrastructure/repositories/prisma-farmer.repository";
+import { GetFarmersUseCase } from "@/features/catalog/application/usecases/search/get-farmers.usecase";
+import { SearchFarmersSchema } from "@/features/catalog/validation/search.schema";
 
 /**
  * @swagger
@@ -44,100 +46,29 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
 
-    const query = searchParams.get("q");
-    const specialties =
-      searchParams.get("specialties")?.split(",").filter(Boolean) || [];
-    const minRating = searchParams.get("min_rating")
-      ? parseFloat(searchParams.get("min_rating")!)
-      : undefined;
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "20");
-    const skip = (page - 1) * limit;
+    const queryParams = Object.fromEntries(searchParams.entries());
+    const validationResult = SearchFarmersSchema.safeParse(queryParams);
 
-    if (!query || query.trim() === "") {
+    if (!validationResult.success) {
       return NextResponse.json(
-        { status: "error", message: "Search query is required" },
+        { status: "error", message: "Invalid query parameters" },
         { status: 400 },
       );
     }
 
-    // Build search filters
-    const where: any = {
-      farmer: {
-        isNot: null,
-      },
-      OR: [
-        { name: { contains: query, mode: "insensitive" } },
-        {
-          farmer: {
-            bio: { contains: query, mode: "insensitive" },
-          },
-        },
-      ],
-    };
+    const { q: query, specialties, min_rating, page, limit } = validationResult.data;
+    const skip = (page - 1) * limit;
 
-    if (specialties.length > 0) {
-      where.farmer = {
-        ...where.farmer,
-        specialties: {
-          some: {
-            specialty: { in: specialties },
-          },
-        },
-      };
-    }
-
-    // Execute search
-    const [farmers, total] = await Promise.all([
-      prisma.user.findMany({
-        where,
-        skip,
-        take: limit,
-        include: {
-          farmer: {
-            include: {
-              specialties: true,
-            },
-          },
-          products: {
-            where: { isAvailable: true },
-            select: { id: true },
-          },
-        },
-      }),
-      prisma.user.count({ where }),
-    ]);
-
-    // Format results
-    const results = farmers
-      .filter((user) => user.farmer) // Extra safety
-      .map((user) => ({
-        id: user.farmer!.id,
-        user_id: user.id,
-        name: user.name,
-        description: user.farmer!.description || "",
-        profile_image: user.avatarUrl,
-        rating: user.farmer!.rating,
-        city: user.farmer!.city,
-        specialties: user.farmer!.specialties.map((s) => s.specialty),
-        total_products: user.products.length,
-      }))
-      .filter((farmer) => {
-        // Apply min rating filter after fetching
-        if (minRating !== undefined) {
-          return farmer.rating >= minRating;
-        }
-        return true;
-      });
+    const useCase = new GetFarmersUseCase(farmerRepository);
+    const result = await useCase.execute(
+      { searchQuery: query, specialties, minRating: min_rating },
+      { skip, take: limit, page }
+    );
 
     return NextResponse.json({
       status: "success",
-      data: results,
-      meta: {
-        total: results.length, // Adjusted for post-filter
-        page,
-        limit,
-      },
+      data: result.farmers,
+      meta: result.pagination,
     });
   } catch (error) {
     console.error("Search farmers error:", error);

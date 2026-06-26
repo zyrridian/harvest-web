@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/core/database/prisma";
+import { GetSearchSuggestionsUseCase } from "@/features/catalog/application/usecases/search/get-suggestions.usecase";
+import { productRepository } from "@/features/catalog/infrastructure/repositories/prisma-product.repository";
+import { categoryRepository } from "@/features/catalog/infrastructure/repositories/prisma-category.repository";
+import { farmerRepository } from "@/features/catalog/infrastructure/repositories/prisma-farmer.repository";
+import { SearchSuggestionsSchema } from "@/features/catalog/validation/search.schema";
 
 /**
  * @swagger
@@ -34,96 +38,24 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
 
-    const query = searchParams.get("q");
-    const type = searchParams.get("type"); // products, farmers, categories
-    const limit = parseInt(searchParams.get("limit") || "10");
+    const queryParams = Object.fromEntries(searchParams.entries());
+    const validationResult = SearchSuggestionsSchema.safeParse(queryParams);
 
-    if (!query || query.trim() === "") {
-      return NextResponse.json({
-        status: "success",
-        data: [],
-      });
-    }
-
-    const suggestions: any[] = [];
-
-    // Search products
-    if (!type || type === "products") {
-      const products = await prisma.product.findMany({
-        where: {
-          isAvailable: true,
-          name: { contains: query, mode: "insensitive" },
-        },
-        take: limit,
-        select: {
-          id: true,
-          name: true,
-        },
-      });
-
-      suggestions.push(
-        ...products.map((p) => ({
-          type: "product",
-          text: p.name,
-          id: p.id,
-        })),
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { status: "error", message: "Invalid query parameters" },
+        { status: 400 },
       );
     }
 
-    // Search categories
-    if (!type || type === "categories") {
-      const categories = await prisma.category.findMany({
-        where: {
-          name: { contains: query, mode: "insensitive" },
-        },
-        take: limit,
-        select: {
-          id: true,
-          name: true,
-        },
-      });
+    const { q: query, type, limit } = validationResult.data;
 
-      suggestions.push(
-        ...categories.map((c) => ({
-          type: "category",
-          text: c.name,
-          id: c.id,
-        })),
-      );
-    }
-
-    // Search farmers
-    if (!type || type === "farmers") {
-      const farmers = await prisma.user.findMany({
-        where: {
-          farmer: { isNot: null },
-          name: { contains: query, mode: "insensitive" },
-        },
-        take: limit,
-        select: {
-          id: true,
-          name: true,
-          farmer: {
-            select: { id: true },
-          },
-        },
-      });
-
-      suggestions.push(
-        ...farmers.map((f) => ({
-          type: "farmer",
-          text: f.name,
-          id: f.farmer?.id || f.id,
-        })),
-      );
-    }
-
-    // Limit total suggestions
-    const limitedSuggestions = suggestions.slice(0, limit);
+    const useCase = new GetSearchSuggestionsUseCase(productRepository, categoryRepository, farmerRepository);
+    const suggestions = await useCase.execute(query, type, limit);
 
     return NextResponse.json({
       status: "success",
-      data: limitedSuggestions,
+      data: suggestions,
     });
   } catch (error) {
     console.error("Search suggestions error:", error);

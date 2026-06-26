@@ -1,13 +1,6 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@/generated/prisma/client";
-import { PrismaPg } from "@prisma/adapter-pg";
-import pg from "pg";
-
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-});
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
+import { masterDataRepository } from "@/features/catalog/infrastructure/repositories/prisma-master-data.repository";
+import { GetProvincesUseCase } from "@/features/catalog/application/usecases/master-data/get-master-data.usecases";
 
 /**
  * @swagger
@@ -41,9 +34,8 @@ const prisma = new PrismaClient({ adapter });
  */
 export async function GET() {
   try {
-    const provinces = await prisma.province.findMany({
-      orderBy: { name: "asc" },
-    });
+    const useCase = new GetProvincesUseCase(masterDataRepository);
+    const provinces = await useCase.execute();
 
     return NextResponse.json({
       status: "success",
@@ -55,7 +47,5 @@ export async function GET() {
       { status: "error", message: "Failed to fetch provinces" },
       { status: 500 }
     );
-  } finally {
-    await prisma.$disconnect();
   }
 }

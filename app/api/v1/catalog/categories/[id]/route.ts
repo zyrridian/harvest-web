@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import prisma from "@/core/database/prisma";
 import { AppError, handleRouteError } from "@/core/errors";
 import { successResponse } from "@/core/helpers/response";
+import { GetCategoryDetailsUseCase } from "@/features/catalog/application/usecases/categories/get-category-details.usecase";
+import { categoryRepository } from "@/features/catalog/infrastructure/repositories/prisma-category.repository";
 
 /**
  * @swagger
@@ -28,26 +30,10 @@ export async function GET(
   try {
     const { id } = await params;
 
-    const category = await prisma.category.findFirst({
-      where: { OR: [{ id }, { slug: id }] },
-      include: { _count: { select: { products: true } } },
-    });
+    const useCase = new GetCategoryDetailsUseCase(categoryRepository);
+    const category = await useCase.execute(id);
 
-    if (!category) {
-      throw AppError.notFound("Category not found");
-    }
-
-    return successResponse({
-      id: category.id,
-      name: category.name,
-      slug: category.slug,
-      description: category.description,
-      emoji: category.emoji,
-      gradient_colors: category.gradientColors,
-      product_count: category._count.products,
-      display_order: category.displayOrder,
-      is_active: category.isActive,
-    });
+    return successResponse(category);
   } catch (error) {
     return handleRouteError(error, "Fetch category");
   }

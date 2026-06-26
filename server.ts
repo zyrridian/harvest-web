@@ -16,6 +16,56 @@ const handle = app.getRequestHandler();
 // Track online users: userId -> Set of socket IDs
 const onlineUsers = new Map<string, Set<string>>();
 
+async function getUserConversationStats(userId: string) {
+  try {
+    const rawStats = await prisma.$queryRaw`
+      SELECT 
+        COUNT(DISTINCT m.conversation_id) as unread_conversations,
+        COUNT(m.id) as total_unread_messages
+      FROM messages m
+      JOIN conversations c ON m.conversation_id = c.id
+      WHERE m.is_read = false 
+        AND m.sender_id != ${userId}
+        AND (
+          (c.participant_1_id = ${userId} AND m.deleted_for_recipient = false) OR
+          (c.participant_2_id = ${userId} AND m.deleted_for_sender = false)
+        )
+    ` as any[];
+    
+    return {
+      unread_conversations: Number(rawStats?.[0]?.unread_conversations || 0),
+      total_unread_messages: Number(rawStats?.[0]?.total_unread_messages || 0)
+    };
+  } catch (error) {
+    console.error("[Socket] Failed to get stats:", error);
+    return null;
+  }
+}
+
+// Cache for conversation participants (conversationId -> { p1, p2 })
+const conversationParticipantsCache = new Map<string, { p1: string; p2: string }>();
+
+async function getConversationParticipants(conversationId: string) {
+  if (conversationParticipantsCache.has(conversationId)) {
+    return conversationParticipantsCache.get(conversationId)!;
+  }
+  const conv = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: { participant1Id: true, participant2Id: true },
+  });
+  if (conv) {
+    const data = { p1: conv.participant1Id, p2: conv.participant2Id };
+    conversationParticipantsCache.set(conversationId, data);
+    // Basic cache clearing if it gets too large
+    if (conversationParticipantsCache.size > 10000) {
+      const firstKey = conversationParticipantsCache.keys().next().value;
+      if (firstKey) conversationParticipantsCache.delete(firstKey);
+    }
+    return data;
+  }
+  return null;
+}
+
 app.prepare().then(() => {
   const httpServer = createServer(async (req, res) => {
     try {
@@ -87,19 +137,8 @@ app.prepare().then(() => {
       })
       .catch(() => {});
 
-    // Join all conversation rooms for this user
-    const conversations = await prisma.conversation
-      .findMany({
-        where: {
-          OR: [{ participant1Id: userId }, { participant2Id: userId }],
-        },
-        select: { id: true },
-      })
-      .catch(() => []);
-
-    for (const conv of conversations) {
-      socket.join(`conversation:${conv.id}`);
-    }
+    // Join the personal user room
+    socket.join(`user_${userId}`);
 
     // Broadcast online status to contacts
     socket.broadcast.emit("user:online", { userId });
@@ -167,11 +206,10 @@ app.prepare().then(() => {
           is_edited: false,
         };
 
-        // Emit to all participants in the room
-        io.to(`conversation:${conversation_id}`).emit(
-          "message:new",
-          messagePayload,
-        );
+        // Emit to both participants' personal user rooms
+        io.to(`user_${conversation.participant1Id}`)
+          .to(`user_${conversation.participant2Id}`)
+          .emit("message:new", messagePayload);
 
         // Emit unread notification to recipient if they're online
         const recipientId =
@@ -180,10 +218,20 @@ app.prepare().then(() => {
             : conversation.participant1Id;
 
         if (onlineUsers.has(recipientId)) {
-          io.to(`conversation:${conversation_id}`).emit("conversation:update", {
+          io.to(`user_${recipientId}`).emit("conversation:update", {
             conversation_id,
             last_message: messagePayload,
           });
+
+          const stats = await getUserConversationStats(recipientId);
+          if (stats) {
+            const userSocketIds = onlineUsers.get(recipientId);
+            if (userSocketIds) {
+              for (const socketId of userSocketIds) {
+                io.to(socketId).emit("conversations:stats", stats);
+              }
+            }
+          }
         }
       } catch (err) {
         console.error("[Socket] message:send error:", err);
@@ -213,11 +261,26 @@ app.prepare().then(() => {
           data: { isRead: true, readAt: new Date() },
         });
 
+        const participants = await getConversationParticipants(conversation_id);
+        if (!participants) return;
+        
+        const senderId = participants.p1 === userId ? participants.p2 : participants.p1;
+
         // Notify sender that messages were read
-        io.to(`conversation:${conversation_id}`).emit("message:read_ack", {
+        io.to(`user_${senderId}`).emit("message:read_ack", {
           conversation_id,
           reader_id: userId,
         });
+
+        const stats = await getUserConversationStats(userId);
+        if (stats) {
+          const userSocketIds = onlineUsers.get(userId);
+          if (userSocketIds) {
+            for (const socketId of userSocketIds) {
+              io.to(socketId).emit("conversations:stats", stats);
+            }
+          }
+        }
       } catch (err) {
         console.error("[Socket] message:read error:", err);
       }
@@ -226,44 +289,40 @@ app.prepare().then(() => {
     // ─────────────────────────────────────────────
     // EVENT: Typing indicator
     // ─────────────────────────────────────────────
-    socket.on("typing:start", (data: any) => {
+    socket.on("typing:start", async (data: any) => {
       if (typeof data === "string") {
         try {
           data = JSON.parse(data);
         } catch (e) {}
       }
       if (!data?.conversation_id) return;
-      socket.to(`conversation:${data.conversation_id}`).emit("typing:start", {
+      
+      const participants = await getConversationParticipants(data.conversation_id);
+      if (!participants) return;
+      const recipientId = participants.p1 === userId ? participants.p2 : participants.p1;
+
+      io.to(`user_${recipientId}`).emit("typing:start", {
         conversation_id: data.conversation_id,
         user_id: userId,
       });
     });
 
-    socket.on("typing:stop", (data: any) => {
+    socket.on("typing:stop", async (data: any) => {
       if (typeof data === "string") {
         try {
           data = JSON.parse(data);
         } catch (e) {}
       }
       if (!data?.conversation_id) return;
-      socket.to(`conversation:${data.conversation_id}`).emit("typing:stop", {
+      
+      const participants = await getConversationParticipants(data.conversation_id);
+      if (!participants) return;
+      const recipientId = participants.p1 === userId ? participants.p2 : participants.p1;
+
+      io.to(`user_${recipientId}`).emit("typing:stop", {
         conversation_id: data.conversation_id,
         user_id: userId,
       });
-    });
-
-    // ─────────────────────────────────────────────
-    // EVENT: Join a new conversation room
-    // ─────────────────────────────────────────────
-    socket.on("conversation:join", (data: any) => {
-      if (typeof data === "string") {
-        try {
-          data = JSON.parse(data);
-        } catch (e) {}
-      }
-      if (data?.conversation_id) {
-        socket.join(`conversation:${data.conversation_id}`);
-      }
     });
 
     // ─────────────────────────────────────────────

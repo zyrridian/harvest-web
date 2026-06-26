@@ -77,6 +77,7 @@ export default function EditProductPage({
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [categories, setCategories] = useState<Category[]>([]);
+  const [units, setUnits] = useState<{value: string, label: string}[]>([]);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -106,7 +107,20 @@ export default function EditProductPage({
   useEffect(() => {
     fetchProduct();
     fetchCategories();
+    fetchUnits();
   }, [id]);
+
+  const fetchUnits = async () => {
+    try {
+      const response = await fetch("/api/v1/units");
+      const data = await response.json();
+      if (response.ok) {
+        setUnits(data.data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch units:", err);
+    }
+  };
 
   const fetchProduct = async () => {
     try {
@@ -276,16 +290,7 @@ export default function EditProductPage({
     }
   };
 
-  const unitOptions = [
-    { value: "kg", label: "Kilogram (kg)" },
-    { value: "gram", label: "Gram (g)" },
-    { value: "pcs", label: "Pieces (pcs)" },
-    { value: "pack", label: "Pack" },
-    { value: "bunch", label: "Bunch" },
-    { value: "box", label: "Box" },
-    { value: "liter", label: "Liter (L)" },
-    { value: "dozen", label: "Dozen" },
-  ];
+
 
   if (isLoading) {
     return (
@@ -547,7 +552,7 @@ export default function EditProductPage({
                   color: colors.heading,
                 }}
               >
-                {unitOptions.map((opt) => (
+                {units.map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}
                   </option>

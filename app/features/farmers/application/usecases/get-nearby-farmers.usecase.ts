@@ -20,13 +20,13 @@ export class GetNearbyFarmersUseCase {
       // Determine tags based on data
       const tags: string[] = [];
 
-      const hasOrganicProduct = farmer.user.products.some((p) => p.isOrganic);
+      const hasOrganicProduct = farmer.user?.products?.some((p) => p.isOrganic) || false;
       if (hasOrganicProduct) tags.push("Organic");
 
       // Determine primary category and subcategory from their products
       let primaryCategory = "General";
       let primarySubcategory = "Various";
-      if (farmer.user.products.length > 0) {
+      if (farmer.user?.products && farmer.user.products.length > 0) {
         const firstProduct = farmer.user.products[0];
         if (firstProduct.category) primaryCategory = firstProduct.category.name;
         if (firstProduct.subcategory) primarySubcategory = firstProduct.subcategory.name;
@@ -39,10 +39,10 @@ export class GetNearbyFarmersUseCase {
       const statusSubText = isOpen ? "closes soon" : "opens tomorrow";
 
       // Products mapping
-      const products = farmer.user.products.map((p) => ({ name: p.name }));
+      const products = farmer.user?.products?.map((p) => ({ name: p.name })) || [];
 
       // We fetched up to 5 products in repo, we can mock extra count if they have more
-      const totalProductsCount = farmer.totalProducts || farmer.user.products.length;
+      const totalProductsCount = farmer.totalProducts || farmer.user?.products?.length || 0;
       const extraProductsCount = totalProductsCount > products.length ? totalProductsCount - products.length : 0;
 
       return {

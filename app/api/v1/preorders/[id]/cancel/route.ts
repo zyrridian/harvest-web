@@ -27,13 +27,14 @@ import { preOrderRepository } from "@/features/preorder/infrastructure/repositor
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const payload = await verifyAuth(request);
+    const resolvedParams = await params;
 
     const useCase = new CancelPreOrderUseCase(preOrderRepository);
-    await useCase.executeUserCancellation(payload.userId, params.id);
+    await useCase.executeUserCancellation(payload.userId, resolvedParams.id);
 
     return successResponse({
       success: true,

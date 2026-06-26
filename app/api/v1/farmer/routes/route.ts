@@ -17,17 +17,7 @@ interface Coord {
   lng: number;
 }
 
-function haversineKm(a: Coord, b: Coord): number {
-  const R = 6371;
-  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
-  const dLon = ((b.lng - a.lng) * Math.PI) / 180;
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((a.lat * Math.PI) / 180) *
-      Math.cos((b.lat * Math.PI) / 180) *
-      Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
-}
+import { haversineKm } from "@/core/helpers/distance";
 
 // Nearest-neighbor TSP fallback (good enough for <20 stops)
 function nearestNeighborOrder(
@@ -164,8 +154,11 @@ export async function GET(request: NextRequest) {
           order_number: s.order.orderNumber,
           recipient_name: s.recipientName,
           address_label: s.addressLabel,
+          address_lat: s.addressLat,
+          address_lng: s.addressLng,
           status: s.status,
           estimated_arrival: s.estimatedArrival,
+          requires_manual_navigation: !s.addressLat,
         })),
       })),
     });
@@ -269,6 +262,16 @@ export async function POST(request: NextRequest) {
 
     // Create route in DB
     const delivDate = new Date(delivery_date);
+
+    // Support "Regenerate" by removing any existing draft routes for this date
+    await prisma.deliveryRoute.deleteMany({
+      where: {
+        farmerId: farmer.id,
+        deliveryDate: delivDate,
+        status: "draft",
+      },
+    });
+
     const route = await prisma.deliveryRoute.create({
       data: {
         farmerId: farmer.id,
@@ -312,8 +315,11 @@ export async function POST(request: NextRequest) {
           stop_order: s.stopOrder,
           order_id: s.orderId,
           address_label: s.addressLabel,
+          address_lat: s.addressLat,
+          address_lng: s.addressLng,
           recipient_name: s.recipientName,
           status: s.status,
+          requires_manual_navigation: !s.addressLat,
         })),
       },
       { message: "Route created and optimized", status: 201 },

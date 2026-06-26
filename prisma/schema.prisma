@@ -828,7 +828,9 @@ model Message {
   images       MessageImage[]
 
   @@index([conversationId])
+  @@index([conversationId, isRead])
   @@index([senderId])
+  @@index([isRead, senderId])
   @@index([createdAt])
   @@map("messages")
 }

@@ -72,6 +72,7 @@ export async function GET(
         status: s.status,
         estimated_arrival: s.estimatedArrival,
         actual_arrival: s.actualArrival,
+        requires_manual_navigation: !s.addressLat,
         items: s.order.items,
         notes: s.notes,
       })),

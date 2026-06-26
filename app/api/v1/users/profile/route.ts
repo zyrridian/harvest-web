@@ -16,7 +16,7 @@ import {
  *     summary: Get user profile information
  *     description: Retrieve the current user's profile information including bio and stats
  *     tags:
- *       - User Profile
+ *       - Users
  *     security:
  *       - BearerAuth: []
  *     responses:
@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
  *     summary: Update user profile information
  *     description: Update the current user's profile including name, phone, and bio
  *     tags:
- *       - User Profile
+ *       - Users
  *     security:
  *       - BearerAuth: []
  *     requestBody:

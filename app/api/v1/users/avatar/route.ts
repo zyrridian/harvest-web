@@ -14,7 +14,7 @@ import {
  *     summary: Update user avatar image
  *     description: Upload and update the current user's avatar image
  *     tags:
- *       - User Profile
+ *       - Users
  *     security:
  *       - BearerAuth: []
  *     requestBody:

@@ -1,96 +1,62 @@
-import { IHarvestScheduleRepository, ScheduleOrder } from "../../domain/repositories/harvest-schedule.repository";
+import { IHarvestScheduleRepository, ScheduleReservation } from "../../domain/repositories/harvest-schedule.repository";
 import prisma from "@/core/database/prisma";
-import { Order } from "@/generated/prisma/client";
+import { PreorderReservation } from "@/generated/prisma/client";
 
 export class PrismaHarvestScheduleRepository implements IHarvestScheduleRepository {
-  async getUserHarvestSchedule(userId: string, targetMonth: Date, latitude?: number, longitude?: number): Promise<ScheduleOrder[]> {
+  async getUserHarvestSchedule(userId: string, targetMonth: Date, latitude?: number, longitude?: number): Promise<ScheduleReservation[]> {
     const startOfMonth = new Date(targetMonth.getFullYear(), targetMonth.getMonth(), 1);
-    const endOfMonth = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 0, 23, 59, 59, 999);
+    const endOfMonth = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 0, 23, 59, 59);
 
-    let orders = await prisma.order.findMany({
+    let reservations = await prisma.preorderReservation.findMany({
       where: {
-        buyerId: userId,
-        isDeposit: true, // Indicates a pre-order reservation
-        items: {
-          some: {
-            product: {
-              harvestDate: {
-                gte: startOfMonth,
-                lte: endOfMonth
-              }
-            }
+        userId,
+        campaign: {
+          estimatedHarvestDate: {
+            gte: startOfMonth,
+            lte: endOfMonth
           }
         }
       },
       include: {
-        items: {
-          include: {
-            product: {
-              include: {
-                seller: {
-                  include: { farmer: true }
-                },
-                images: true
-              }
-            }
-          }
+        campaign: {
+          include: { farmer: true }
         }
       },
       orderBy: {
-        createdAt: 'asc'
+        campaign: {
+          estimatedHarvestDate: 'asc'
+        }
       }
-    });
-
-    // Optionally sort items by harvest date
-    orders.sort((a: any, b: any) => {
-      const aDate = a.items[0]?.product?.harvestDate?.getTime() || 0;
-      const bDate = b.items[0]?.product?.harvestDate?.getTime() || 0;
-      return aDate - bDate;
     });
 
     if (latitude && longitude) {
-      orders = orders.map((o) => {
-        const farmer = o.items[0]?.product?.seller?.farmer;
-        if (farmer?.latitude && farmer?.longitude) {
-          (o as any).distance = this.calculateDistance(
+      reservations = reservations.map((r) => {
+        if (r.campaign.farmer?.latitude && r.campaign.farmer?.longitude) {
+          (r as any).distance = this.calculateDistance(
             latitude,
             longitude,
-            farmer.latitude,
-            farmer.longitude
+            r.campaign.farmer.latitude,
+            r.campaign.farmer.longitude
           );
         }
-        return o;
+        return r;
       });
     }
 
-    return orders as ScheduleOrder[];
+    return reservations as ScheduleReservation[];
   }
 
-  async updateOrderDeposit(orderId: string): Promise<Order> {
-    return prisma.order.update({
-      where: { id: orderId },
-      data: {
-        paymentStatus: "paid",
-        status: "confirmed",
-        paidAt: new Date()
-      }
+  async updateReservationStatus(reservationId: string, status: string): Promise<PreorderReservation> {
+    return prisma.preorderReservation.update({
+      where: { id: reservationId },
+      data: { status }
     });
   }
 
-  async updateOrderPickup(orderId: string, pickupTime: string): Promise<Order> {
-    return prisma.order.update({
-      where: { id: orderId },
-      data: {
-        deliveryMethod: "pickup",
-        deliveryTimeSlot: pickupTime,
-        status: "pickup_arranged"
-      }
-    });
-  }
-
-  async findOrderById(orderId: string): Promise<Order | null> {
-    return prisma.order.findUnique({
-      where: { id: orderId }
+  async findReservationById(reservationId: string): Promise<PreorderReservation | null> {
+    return prisma.preorderReservation.findUnique({
+      where: { id: reservationId },
+      include: { campaign: true }
     });
   }
 

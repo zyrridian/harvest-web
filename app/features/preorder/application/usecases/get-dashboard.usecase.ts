@@ -5,28 +5,27 @@ export class GetPreOrderDashboardUseCase {
   constructor(private readonly preorderRepo: IPreOrderRepository) {}
 
   async execute(userId: string, latitude?: number, longitude?: number): Promise<PreOrderDashboardResponseDTO> {
-    const [harvestsData, reservationsData, activeCount] = await Promise.all([
-      this.preorderRepo.getAvailableHarvests(latitude, longitude),
-      this.preorderRepo.getUserReservations(userId),
-      this.preorderRepo.getActiveHarvestsCount()
+    const [campaignsData, reservationsData] = await Promise.all([
+      this.preorderRepo.getAvailableCampaigns(latitude, longitude),
+      this.preorderRepo.getUserReservations(userId)
     ]);
 
-    const available_harvests: AvailableHarvestDTO[] = harvestsData.map(h => {
-      const daysLeft = h.harvestDate ? Math.ceil((h.harvestDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : 0;
-      const total = h.targetAmount || 100;
-      const booked = h.currentBooked || 0;
+    const available_harvests: AvailableHarvestDTO[] = campaignsData.map(c => {
+      const daysLeft = c.estimatedHarvestDate ? Math.ceil((c.estimatedHarvestDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : 0;
+      const total = c.targetQuantity || 100;
+      const booked = c.currentBookedQuantity || 0;
       let status = "Available";
       if (booked >= total) status = "Full";
       else if (booked >= total * 0.8) status = "Almost full";
 
       return {
-        id: h.id,
-        title: h.name,
-        farmer_name: h.seller.farmer?.name || h.seller.name,
-        distance: this.formatDistance((h as any).distance),
-        image_url: h.images[0]?.url || "🍓",
-        price: h.price,
-        unit: h.unit,
+        id: c.id,
+        title: c.title,
+        farmer_name: c.farmer?.name || "Unknown Farmer",
+        distance: this.formatDistance((c as any).distance),
+        image_url: "🍓", // We might add image fields to campaign later
+        price: c.pricePerUnit,
+        unit: c.unit,
         booked_quantity: booked,
         total_quantity: total,
         days_left: daysLeft > 0 ? daysLeft : 0,
@@ -35,29 +34,28 @@ export class GetPreOrderDashboardUseCase {
     });
 
     const active_reservations: ActiveReservationDTO[] = reservationsData.map(r => {
-      const item = r.items[0]; // Assuming 1 item per reservation for simplicity, based on UI
-      const product = item?.product;
-      const daysToHarvest = product?.harvestDate ? Math.ceil((product.harvestDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : 0;
+      const c = r.campaign;
+      const daysToHarvest = c?.estimatedHarvestDate ? Math.ceil((c.estimatedHarvestDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : 0;
       
       let statusStr = "Pending";
-      if (r.status === "confirmed") statusStr = "Confirmed";
-      else if (r.status === "processing") statusStr = "Processing";
+      if (r.status === "DEPOSIT_PAID") statusStr = "Confirmed";
+      else if (r.status === "FULLY_PAID") statusStr = "Processing";
 
       return {
         id: r.id,
-        title: product?.name || "Unknown Product",
-        quantity_str: `${item?.quantity || 0} ${product?.unit || ""}`,
-        farmer_name: product?.seller?.farmer?.name || product?.seller?.name || "Unknown Farmer",
+        title: c?.title || "Unknown Campaign",
+        quantity_str: `${r.quantity || 0} ${c?.unit || ""}`,
+        farmer_name: c?.farmer?.name || "Unknown Farmer",
         days_to_harvest: daysToHarvest > 0 ? daysToHarvest : 0,
-        image_url: product?.images?.[0]?.url || "🍅",
+        image_url: "🍅",
         status: statusStr
       };
     });
 
     return {
-      active_harvests_count: activeCount,
+      active_harvests_count: available_harvests.length,
       your_reservations_count: active_reservations.length,
-      avg_savings: "30%", // Placeholder or based on actual discount calculation
+      avg_savings: "30%", // Placeholder
       available_harvests,
       active_reservations
     };

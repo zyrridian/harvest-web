@@ -14,7 +14,7 @@ import { authRepository } from "@/features/auth/infrastructure/repositories/pris
  *     summary: Authenticate user and get access token
  *     description: Login with email and password to receive JWT tokens
  *     tags:
- *       - Authentication
+ *       - Auth
  *     requestBody:
  *       required: true
  *       content:

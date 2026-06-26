@@ -12,7 +12,7 @@ import { authRepository } from "@/features/auth/infrastructure/repositories/pris
  *     summary: Get current authenticated user
  *     description: Retrieve the currently logged in user's information
  *     tags:
- *       - Authentication
+ *       - Auth
  *     security:
  *       - BearerAuth: []
  *     responses:

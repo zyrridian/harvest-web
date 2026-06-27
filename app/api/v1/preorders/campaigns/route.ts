@@ -14,7 +14,7 @@ import { preOrderRepository } from "@/features/preorder/infrastructure/repositor
  *     tags:
  *       - Preorders
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: Campaign created successfully

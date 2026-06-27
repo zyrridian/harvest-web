@@ -16,7 +16,7 @@ import { cartRepository } from "@/features/cart/infrastructure/repositories/pris
  *     tags:
  *       - Sales
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:

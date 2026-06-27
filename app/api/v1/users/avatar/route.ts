@@ -16,7 +16,7 @@ import {
  *     tags:
  *       - Users
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:

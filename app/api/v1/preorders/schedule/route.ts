@@ -14,7 +14,7 @@ import { harvestScheduleRepository } from "@/features/harvest-schedule/infrastru
  *     tags:
  *       - Preorders
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: month

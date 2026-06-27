@@ -9,7 +9,7 @@ import { verifyAdmin } from "@/features/auth";
  *     summary: Get all categories (including inactive)
  *     tags: [Admin]
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: include_inactive
@@ -28,7 +28,7 @@ import { verifyAdmin } from "@/features/auth";
  *     summary: Create a new category
  *     tags: [Admin]
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:

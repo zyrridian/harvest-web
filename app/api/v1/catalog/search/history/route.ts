@@ -38,8 +38,14 @@ export async function GET(request: NextRequest) {
       status: "success",
       data,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Get search history error:", error);
+    if (error.name === "AppError") {
+      return NextResponse.json(
+        { status: "error", message: error.message },
+        { status: error.statusCode }
+      );
+    }
     return NextResponse.json(
       { status: "error", message: "Failed to fetch search history" },
       { status: 500 },
@@ -72,8 +78,14 @@ export async function DELETE(request: NextRequest) {
       status: "success",
       message: "Search history cleared",
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Clear search history error:", error);
+    if (error.name === "AppError") {
+      return NextResponse.json(
+        { status: "error", message: error.message },
+        { status: error.statusCode }
+      );
+    }
     return NextResponse.json(
       { status: "error", message: "Failed to clear search history" },
       { status: 500 },

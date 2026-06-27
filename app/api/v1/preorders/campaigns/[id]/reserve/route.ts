@@ -16,7 +16,7 @@ import { preOrderRepository } from "@/features/preorder/infrastructure/repositor
  *     tags:
  *       - Preorders
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id

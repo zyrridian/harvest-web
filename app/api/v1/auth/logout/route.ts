@@ -15,7 +15,7 @@ import { authRepository } from "@/features/auth/infrastructure/repositories/pris
  *     tags:
  *       - Auth
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: Logged out successfully

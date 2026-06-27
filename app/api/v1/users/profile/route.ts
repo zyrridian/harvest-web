@@ -18,7 +18,7 @@ import {
  *     tags:
  *       - Users
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: Profile retrieved successfully
@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
  *     tags:
  *       - Users
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:

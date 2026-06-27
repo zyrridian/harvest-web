@@ -9,7 +9,7 @@ import { verifyAdmin } from "@/features/auth";
  *     summary: Get a specific category
  *     tags: [Admin]
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -25,7 +25,7 @@ import { verifyAdmin } from "@/features/auth";
  *     summary: Update a category
  *     tags: [Admin]
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -65,7 +65,7 @@ import { verifyAdmin } from "@/features/auth";
  *     description: Deletes a category if it has no products. Otherwise, deactivates it.
  *     tags: [Admin]
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id

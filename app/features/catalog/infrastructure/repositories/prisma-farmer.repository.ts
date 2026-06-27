@@ -4,31 +4,38 @@ import { FarmerEntity } from '../../domain/entities/farmer.entity';
 
 export class PrismaFarmerRepository implements IFarmerRepository {
   async findMany(query: FindFarmersQuery, skip: number, limit: number): Promise<[FarmerEntity[], number]> {
-    const where: any = {
-      farmer: {
-        isNot: null,
-      },
-    };
-
+    const where: any = {};
+    const farmerConditions: any = {};
+    
     if (query.searchQuery) {
       where.OR = [
         { name: { contains: query.searchQuery, mode: "insensitive" } },
         {
           farmer: {
-            bio: { contains: query.searchQuery, mode: "insensitive" },
+            is: {
+              description: { contains: query.searchQuery, mode: "insensitive" },
+            },
           },
         },
       ];
     }
 
     if (query.specialties && query.specialties.length > 0) {
-      where.farmer = {
-        ...where.farmer,
-        specialties: {
-          some: {
-            specialty: { in: query.specialties },
-          },
+      farmerConditions.specialties = {
+        some: {
+          specialty: { in: query.specialties },
         },
+      };
+    }
+
+    if (Object.keys(farmerConditions).length > 0) {
+      where.farmer = {
+        is: farmerConditions,
+        isNot: null,
+      };
+    } else {
+      where.farmer = {
+        isNot: null,
       };
     }
 

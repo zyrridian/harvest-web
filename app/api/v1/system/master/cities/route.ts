@@ -1,24 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { masterDataRepository } from "@/features/catalog/infrastructure/repositories/prisma-master-data.repository";
-import { GetDistrictsUseCase } from "@/features/catalog/application/usecases/master-data/get-master-data.usecases";
+import { GetCitiesUseCase } from "@/features/catalog/application/usecases/master-data/get-master-data.usecases";
 
 /**
  * @swagger
- * /api/v1/catalog/master/districts:
+ * /api/v1/system/master/cities:
  *   get:
- *     summary: Get districts
- *     description: Retrieves a list of districts. Can be filtered by city_id.
+ *     summary: Get cities
+ *     description: Retrieves a list of cities. Can be filtered by province_id.
  *     tags:
- *       - Catalog
+ *       - System
  *     parameters:
  *       - in: query
- *         name: city_id
+ *         name: province_id
  *         schema:
  *           type: integer
- *         description: ID of the city to filter districts by
+ *         description: ID of the province to filter cities by
  *     responses:
  *       200:
- *         description: Successfully retrieved districts
+ *         description: Successfully retrieved cities
  *         content:
  *           application/json:
  *             schema:
@@ -30,7 +30,7 @@ import { GetDistrictsUseCase } from "@/features/catalog/application/usecases/mas
  *                 data:
  *                   type: array
  *                   items:
- *                     $ref: '#/components/schemas/District'
+ *                     $ref: '#/components/schemas/City'
  *       500:
  *         description: Internal server error
  *         content:
@@ -41,19 +41,19 @@ import { GetDistrictsUseCase } from "@/features/catalog/application/usecases/mas
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const cityId = searchParams.get("city_id");
+    const provinceId = searchParams.get("province_id");
 
-    const useCase = new GetDistrictsUseCase(masterDataRepository);
-    const mappedDistricts = await useCase.execute(cityId ? parseInt(cityId, 10) : undefined);
+    const useCase = new GetCitiesUseCase(masterDataRepository);
+    const mappedCities = await useCase.execute(provinceId ? parseInt(provinceId, 10) : undefined);
 
     return NextResponse.json({
       status: "success",
-      data: mappedDistricts,
+      data: mappedCities,
     });
   } catch (error) {
-    console.error("Error fetching districts:", error);
+    console.error("Error fetching cities:", error);
     return NextResponse.json(
-      { status: "error", message: "Failed to fetch districts" },
+      { status: "error", message: "Failed to fetch cities" },
       { status: 500 }
     );
   }

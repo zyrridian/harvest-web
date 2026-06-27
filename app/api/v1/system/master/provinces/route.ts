@@ -4,12 +4,12 @@ import { GetProvincesUseCase } from "@/features/catalog/application/usecases/mas
 
 /**
  * @swagger
- * /api/v1/catalog/master/provinces:
+ * /api/v1/system/master/provinces:
  *   get:
  *     summary: Get all provinces
  *     description: Retrieves a list of all geographical provinces in the system
  *     tags:
- *       - Catalog
+ *       - System
  *     responses:
  *       200:
  *         description: Successfully retrieved provinces

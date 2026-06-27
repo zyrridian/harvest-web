@@ -1,5 +1,4 @@
 import { NextRequest } from "next/server";
-import prisma from "@/core/database/prisma";
 import { handleRouteError } from "@/core/errors";
 import { successResponse } from "@/core/helpers/response";
 import { GetCategoriesUseCase } from "@/features/catalog/application/usecases/categories/get-categories.usecase";

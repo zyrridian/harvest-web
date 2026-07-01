@@ -10,6 +10,9 @@ import { searchRepository } from "@/features/catalog/infrastructure/repositories
  *   get:
  *     summary: Search for products
  *     tags: [Catalog]
+ *     security:
+ *       - {}
+ *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: q

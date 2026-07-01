@@ -3,7 +3,7 @@ import { AddCartItemInputDTO, CartSummaryResponseDTO } from "../dtos/cart.dto";
 import { AppError } from "@/core/errors";
 
 export class AddCartItemUseCase {
-  constructor(private readonly cartRepo: ICartRepository) {}
+  constructor(private readonly cartRepo: ICartRepository) { }
 
   async execute(userId: string, input: AddCartItemInputDTO): Promise<CartSummaryResponseDTO> {
     // 1. Validate product exists

@@ -2,8 +2,8 @@ import { NextRequest } from "next/server";
 import { verifyAuth } from "@/features/auth";
 import { handleRouteError } from "@/core/errors";
 import { successResponse } from "@/core/helpers/response";
-import { UpdateCartItemUseCase, RemoveCartItemUseCase } from "@/features/cart/application/usecases/cart.usecases";
-import { cartRepository } from "@/features/cart/infrastructure/repositories/prisma-cart.repository";
+import { UpdateCartItemUseCase, RemoveCartItemUseCase } from "@/features/sales/application/usecases/cart.usecases";
+import { cartRepository } from "@/features/sales/infrastructure/repositories/prisma-cart.repository";
 
 /**
  * @swagger

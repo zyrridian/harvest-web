@@ -3,7 +3,7 @@ import { BUSINESS } from "@/core/config/constants";
 import { AppError } from "@/core/errors";
 
 export class GetCartUseCase {
-  constructor(private readonly cartRepo: ICartRepository) {}
+  constructor(private readonly cartRepo: ICartRepository) { }
 
   async execute(userId: string): Promise<any> {
     let cart = await this.cartRepo.findCartByUserId(userId);
@@ -30,10 +30,10 @@ export class GetCartUseCase {
           price: item.product.price,
           discount: activeDiscount
             ? {
-                discounted_price: discountPrice,
-                value: activeDiscount.value,
-                valid_until: activeDiscount.validUntil,
-              }
+              discounted_price: discountPrice,
+              value: activeDiscount.value,
+              valid_until: activeDiscount.validUntil,
+            }
             : null,
           image: primaryImage?.url || null,
           unit: item.product.unit,
@@ -118,7 +118,7 @@ export class GetCartUseCase {
       (sum, item) =>
         sum +
         (item.unit_price - (item.discount_price || item.unit_price)) *
-          item.quantity,
+        item.quantity,
       0,
     );
     const totalDeliveryFee = groupedArray.reduce(
@@ -159,7 +159,7 @@ export class GetCartUseCase {
 }
 
 export class ClearCartUseCase {
-  constructor(private readonly cartRepo: ICartRepository) {}
+  constructor(private readonly cartRepo: ICartRepository) { }
 
   async execute(userId: string): Promise<void> {
     await this.cartRepo.clearCart(userId);
@@ -167,7 +167,7 @@ export class ClearCartUseCase {
 }
 
 export class UpdateCartItemUseCase {
-  constructor(private readonly cartRepo: ICartRepository) {}
+  constructor(private readonly cartRepo: ICartRepository) { }
 
   async execute(userId: string, cartItemId: string, input: { quantity?: number; notes?: string }): Promise<any> {
     const { quantity, notes } = input;
@@ -232,7 +232,7 @@ export class UpdateCartItemUseCase {
 }
 
 export class RemoveCartItemUseCase {
-  constructor(private readonly cartRepo: ICartRepository) {}
+  constructor(private readonly cartRepo: ICartRepository) { }
 
   async execute(userId: string, cartItemId: string): Promise<any> {
     const cartItem = await this.cartRepo.findCartItemById(cartItemId);
@@ -256,7 +256,7 @@ export class RemoveCartItemUseCase {
 }
 
 export class ToggleCartItemSelectionUseCase {
-  constructor(private readonly cartRepo: ICartRepository) {}
+  constructor(private readonly cartRepo: ICartRepository) { }
 
   async execute(userId: string, cartItemId: string, is_selected: boolean): Promise<any> {
     if (is_selected === undefined) {

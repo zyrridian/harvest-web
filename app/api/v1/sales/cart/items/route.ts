@@ -3,9 +3,9 @@ import { verifyAuth } from "@/features/auth";
 import { handleRouteError } from "@/core/errors";
 import { successResponse } from "@/core/helpers/response";
 import { parseBody } from "@/core/helpers/parseBody";
-import { AddCartItemSchema } from "@/features/cart/application/dtos/cart.dto";
-import { AddCartItemUseCase } from "@/features/cart/application/usecases/add-cart-item.usecase";
-import { cartRepository } from "@/features/cart/infrastructure/repositories/prisma-cart.repository";
+import { AddCartItemSchema } from "@/features/sales/application/dtos/cart.dto";
+import { AddCartItemUseCase } from "@/features/sales/application/usecases/add-cart-item.usecase";
+import { cartRepository } from "@/features/sales/infrastructure/repositories/prisma-cart.repository";
 
 /**
  * @swagger
@@ -35,7 +35,7 @@ import { cartRepository } from "@/features/cart/infrastructure/repositories/pris
 export async function POST(request: NextRequest) {
   try {
     const payload = await verifyAuth(request);
-    
+
     const body = await parseBody(request);
     const input = AddCartItemSchema.parse(body);
 
